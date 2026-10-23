@@ -1,0 +1,6 @@
+{
+  "name": "CircuLab - Krets- & Koblingsbrettdesigner",
+  "description": "Avansert interaktiv krets- og koblingsbrett-designer med komponentbibliotek, kabling, komponent-editor, ERC-validering og sanntidslogikksimulering inspirert av Fritzing.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
