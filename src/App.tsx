@@ -1,8 +1,12 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
+  AlignmentType,
   CircuitComponentInstance,
+  CircuitLayer,
   CircuitProject,
   ComponentDefinition,
+  DEFAULT_LAYERS,
+  DistributionType,
   ExternalLibrary,
   StickyNote,
   WireConnection,
@@ -16,6 +20,7 @@ import {
 } from './data/externalLibraries';
 import { PRESET_PROJECTS } from './data/presetProjects';
 import { analyzeCircuit } from './utils/circuitSimulation';
+import { autoLayoutComponents } from './utils/autoLayout';
 import { CircuitCanvas } from './components/canvas/CircuitCanvas';
 import { HeaderBar } from './components/toolbar/HeaderBar';
 import { CanvasToolbar } from './components/toolbar/CanvasToolbar';
@@ -27,6 +32,9 @@ import { LibraryManagerModal } from './components/modals/LibraryManagerModal';
 import { BOMModal } from './components/modals/BOMModal';
 import { ERCWarningsDrawer } from './components/modals/ERCWarningsDrawer';
 import { ProjectManagerModal, saveProjectToStorage } from './components/modals/ProjectManagerModal';
+import { LayerManagerDrawer } from './components/layers/LayerManagerDrawer';
+import { PDFExportModal } from './components/modals/PDFExportModal';
+import { ImageExportModal } from './components/modals/ImageExportModal';
 import { PanelLeft, PanelRight } from 'lucide-react';
 
 export default function App() {
@@ -125,9 +133,9 @@ export default function App() {
     }
   }, [project]);
 
-  // 3. Selection & Canvas Settings
-  const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
-  const [selectedWireId, setSelectedWireId] = useState<string | null>(null);
+  // 3. Selection & Canvas Settings (Supports Multi-Selection)
+  const [selectedComponentIds, setSelectedComponentIds] = useState<string[]>([]);
+  const [selectedWireIds, setSelectedWireIds] = useState<string[]>([]);
   const [activeWireColor, setActiveWireColor] = useState<string>('#dc2626');
   const [snapToGrid, setSnapToGrid] = useState<boolean>(true);
 
@@ -228,6 +236,46 @@ export default function App() {
   const [isBOMOpen, setIsBOMOpen] = useState(false);
   const [isERCWarningsOpen, setIsERCWarningsOpen] = useState(false);
   const [isProjectsOpen, setIsProjectsOpen] = useState(false);
+  const [isLayersOpen, setIsLayersOpen] = useState(false);
+  const [isPDFExportOpen, setIsPDFExportOpen] = useState(false);
+  const [isImageExportOpen, setIsImageExportOpen] = useState(false);
+
+  // Active Layers for current project
+  const projectLayers = useMemo(() => {
+    return project.layers && project.layers.length > 0 ? project.layers : DEFAULT_LAYERS;
+  }, [project.layers]);
+
+  // Handler: Update Layer configurations (visibility, lock, name, color)
+  const handleUpdateLayers = useCallback(
+    (updatedLayers: CircuitLayer[]) => {
+      pushToHistory(project);
+      setProject((prev) => ({
+        ...prev,
+        layers: updatedLayers,
+      }));
+    },
+    [project, pushToHistory]
+  );
+
+  // Handler: Move elements from a deleted layer to another layer
+  const handleMoveComponentsToLayer = useCallback(
+    (sourceLayerId: string, targetLayerId: string) => {
+      pushToHistory(project);
+      setProject((prev) => ({
+        ...prev,
+        components: prev.components.map((c) =>
+          c.layerId === sourceLayerId ? { ...c, layerId: targetLayerId } : c
+        ),
+        wires: prev.wires.map((w) =>
+          w.layerId === sourceLayerId ? { ...w, layerId: targetLayerId } : w
+        ),
+        notes: (prev.notes || []).map((n) =>
+          n.layerId === sourceLayerId ? { ...n, layerId: targetLayerId } : n
+        ),
+      }));
+    },
+    [project, pushToHistory]
+  );
 
   // 8. Run Circuit Analysis & Electrical Rule Check (ERC)
   const simulationResult = useMemo(() => {
@@ -257,11 +305,12 @@ export default function App() {
     });
   }, [project.components, simulationResult.activeComponents, isSimulating, buttonPressedStates]);
 
-  // Selected Component & Definition
-  const selectedComponent = useMemo(() => {
-    if (!selectedComponentId) return null;
-    return activeComponentsWithSim.find((c) => c.id === selectedComponentId) || null;
-  }, [selectedComponentId, activeComponentsWithSim]);
+  // Selected Components & Definitions
+  const selectedComponents = useMemo(() => {
+    return activeComponentsWithSim.filter((c) => selectedComponentIds.includes(c.id));
+  }, [selectedComponentIds, activeComponentsWithSim]);
+
+  const selectedComponent = selectedComponents[0] || null;
 
   const selectedComponentDef = useMemo(() => {
     if (!selectedComponent) return null;
@@ -303,8 +352,8 @@ export default function App() {
         ...prev,
         components: [...prev.components, newComp],
       }));
-      setSelectedComponentId(newComp.id);
-      setSelectedWireId(null);
+      setSelectedComponentIds([newComp.id]);
+      setSelectedWireIds([]);
 
       // Proactively open/suggest guide if user adds LED, Arduino, or ESP32 and guide is not yet open
       if (typeId === 'led_5mm' || typeId === 'arduino_uno' || typeId === 'esp32_devkit') {
@@ -346,60 +395,74 @@ export default function App() {
     [project, pushToHistory]
   );
 
-  // Handler: Rotate Component 90°
+  // Handler: Rotate Component(s) 90°
   const handleRotateComponent = useCallback(
-    (id: string) => {
+    (targetId?: string) => {
       pushToHistory(project);
+      const idsToRotate = targetId ? [targetId] : selectedComponentIds;
+      if (idsToRotate.length === 0) return;
+
       setProject((prev) => ({
         ...prev,
         components: prev.components.map((c) => {
-          if (c.id !== id) return c;
+          if (!idsToRotate.includes(c.id)) return c;
           const nextRot = ((c.rotation + 90) % 360) as 0 | 90 | 180 | 270;
           return { ...c, rotation: nextRot };
         }),
       }));
     },
-    [project, pushToHistory]
+    [project, pushToHistory, selectedComponentIds]
   );
 
-  // Handler: Duplicate Component
+  // Handler: Duplicate Component(s)
   const handleDuplicateComponent = useCallback(
-    (id: string) => {
-      const target = project.components.find((c) => c.id === id);
-      if (!target) return;
+    (targetId?: string) => {
+      const idsToDup = targetId ? [targetId] : selectedComponentIds;
+      if (idsToDup.length === 0) return;
 
       pushToHistory(project);
-      const dup: CircuitComponentInstance = {
-        ...target,
-        id: `comp_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-        label: `${target.label}_Kopi`,
-        x: target.x + 30,
-        y: target.y + 30,
-      };
+      const newDuplicates: CircuitComponentInstance[] = [];
+
+      idsToDup.forEach((id) => {
+        const target = project.components.find((c) => c.id === id);
+        if (!target) return;
+        newDuplicates.push({
+          ...target,
+          id: `comp_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          label: `${target.label}_Kopi`,
+          x: target.x + 30,
+          y: target.y + 30,
+        });
+      });
 
       setProject((prev) => ({
         ...prev,
-        components: [...prev.components, dup],
+        components: [...prev.components, ...newDuplicates],
       }));
-      setSelectedComponentId(dup.id);
+      setSelectedComponentIds(newDuplicates.map((d) => d.id));
     },
-    [project, pushToHistory]
+    [project, pushToHistory, selectedComponentIds]
   );
 
-  // Handler: Delete Component
+  // Handler: Delete Component(s)
   const handleDeleteComponent = useCallback(
-    (id: string) => {
+    (targetId?: string) => {
+      const idsToDelete = targetId ? [targetId] : selectedComponentIds;
+      if (idsToDelete.length === 0) return;
+
       pushToHistory(project);
       setProject((prev) => ({
         ...prev,
-        components: prev.components.filter((c) => c.id !== id),
+        components: prev.components.filter((c) => !idsToDelete.includes(c.id)),
         wires: prev.wires.filter(
-          (w) => w.fromComponentId !== id && w.toComponentId !== id
+          (w) =>
+            !idsToDelete.includes(w.fromComponentId) &&
+            !idsToDelete.includes(w.toComponentId)
         ),
       }));
-      if (selectedComponentId === id) setSelectedComponentId(null);
+      setSelectedComponentIds((prev) => prev.filter((id) => !idsToDelete.includes(id)));
     },
-    [project, pushToHistory, selectedComponentId]
+    [project, pushToHistory, selectedComponentIds]
   );
 
   // Handler: Add Wire
@@ -410,32 +473,217 @@ export default function App() {
         ...prev,
         wires: [...prev.wires, wire],
       }));
-      setSelectedWireId(wire.id);
+      setSelectedWireIds([wire.id]);
     },
     [project, pushToHistory]
   );
 
-  // Handler: Delete Wire
+  // Handler: Delete Wire(s)
   const handleDeleteWire = useCallback(
-    (wireId: string) => {
+    (targetWireId?: string) => {
+      const wireIdsToDelete = targetWireId ? [targetWireId] : selectedWireIds;
+      if (wireIdsToDelete.length === 0) return;
+
       pushToHistory(project);
       setProject((prev) => ({
         ...prev,
-        wires: prev.wires.filter((w) => w.id !== wireId),
+        wires: prev.wires.filter((w) => !wireIdsToDelete.includes(w.id)),
       }));
-      if (selectedWireId === wireId) setSelectedWireId(null);
+      setSelectedWireIds((prev) => prev.filter((id) => !wireIdsToDelete.includes(id)));
     },
-    [project, pushToHistory, selectedWireId]
+    [project, pushToHistory, selectedWireIds]
   );
 
-  // Handler: Delete Selected (Component or Wire)
+  // Handler: Delete Selected (Bulk components and wires)
   const handleDeleteSelected = useCallback(() => {
-    if (selectedComponentId) {
-      handleDeleteComponent(selectedComponentId);
-    } else if (selectedWireId) {
-      handleDeleteWire(selectedWireId);
+    if (selectedComponentIds.length > 0 || selectedWireIds.length > 0) {
+      pushToHistory(project);
+      setProject((prev) => ({
+        ...prev,
+        components: prev.components.filter((c) => !selectedComponentIds.includes(c.id)),
+        wires: prev.wires.filter(
+          (w) =>
+            !selectedWireIds.includes(w.id) &&
+            !selectedComponentIds.includes(w.fromComponentId) &&
+            !selectedComponentIds.includes(w.toComponentId)
+        ),
+      }));
+      setSelectedComponentIds([]);
+      setSelectedWireIds([]);
     }
-  }, [selectedComponentId, selectedWireId, handleDeleteComponent, handleDeleteWire]);
+  }, [project, pushToHistory, selectedComponentIds, selectedWireIds]);
+
+  // Alignment Controls Implementation
+  const handleAlignComponents = useCallback(
+    (type: AlignmentType) => {
+      if (selectedComponentIds.length < 2) return;
+      pushToHistory(project);
+
+      const comps = project.components.filter((c) => selectedComponentIds.includes(c.id));
+      if (comps.length < 2) return;
+
+      let minX = Infinity;
+      let maxX = -Infinity;
+      let minY = Infinity;
+      let maxY = -Infinity;
+
+      comps.forEach((comp) => {
+        const def = componentDefsMap.get(comp.typeId);
+        const w = def?.width || 60;
+        const h = def?.height || 60;
+        minX = Math.min(minX, comp.x);
+        maxX = Math.max(maxX, comp.x + w);
+        minY = Math.min(minY, comp.y);
+        maxY = Math.max(maxY, comp.y + h);
+      });
+
+      const centerH = (minX + maxX) / 2;
+      const centerV = (minY + maxY) / 2;
+
+      setProject((prev) => ({
+        ...prev,
+        components: prev.components.map((comp) => {
+          if (!selectedComponentIds.includes(comp.id)) return comp;
+          const def = componentDefsMap.get(comp.typeId);
+          const w = def?.width || 60;
+          const h = def?.height || 60;
+
+          let nextX = comp.x;
+          let nextY = comp.y;
+
+          switch (type) {
+            case 'left':
+              nextX = minX;
+              break;
+            case 'center-h':
+              nextX = Math.round(centerH - w / 2);
+              break;
+            case 'right':
+              nextX = maxX - w;
+              break;
+            case 'top':
+              nextY = minY;
+              break;
+            case 'center-v':
+              nextY = Math.round(centerV - h / 2);
+              break;
+            case 'bottom':
+              nextY = maxY - h;
+              break;
+          }
+
+          if (snapToGrid) {
+            nextX = Math.round(nextX / 10) * 10;
+            nextY = Math.round(nextY / 10) * 10;
+          }
+
+          return { ...comp, x: nextX, y: nextY };
+        }),
+      }));
+    },
+    [project, selectedComponentIds, componentDefsMap, pushToHistory, snapToGrid]
+  );
+
+  // Distribution Controls Implementation
+  const handleDistributeComponents = useCallback(
+    (type: DistributionType) => {
+      if (selectedComponentIds.length < 3) return;
+      pushToHistory(project);
+
+      const comps = project.components.filter((c) => selectedComponentIds.includes(c.id));
+      if (comps.length < 3) return;
+
+      if (type === 'horizontal') {
+        const sorted = [...comps].sort((a, b) => a.x - b.x);
+        const first = sorted[0];
+        const last = sorted[sorted.length - 1];
+        const lastDef = componentDefsMap.get(last.typeId);
+        const lastW = lastDef?.width || 60;
+
+        const totalSpan = last.x + lastW - first.x;
+        const sumCompWidths = sorted.reduce((sum, c) => {
+          const def = componentDefsMap.get(c.typeId);
+          return sum + (def?.width || 60);
+        }, 0);
+
+        const totalGap = totalSpan - sumCompWidths;
+        const gap = totalGap / (sorted.length - 1);
+
+        let curX = first.x;
+        const newPos = new Map<string, number>();
+
+        sorted.forEach((comp) => {
+          const def = componentDefsMap.get(comp.typeId);
+          const w = def?.width || 60;
+          newPos.set(comp.id, Math.round(curX));
+          curX += w + gap;
+        });
+
+        setProject((prev) => ({
+          ...prev,
+          components: prev.components.map((c) =>
+            newPos.has(c.id) ? { ...c, x: newPos.get(c.id)! } : c
+          ),
+        }));
+      } else {
+        const sorted = [...comps].sort((a, b) => a.y - b.y);
+        const first = sorted[0];
+        const last = sorted[sorted.length - 1];
+        const lastDef = componentDefsMap.get(last.typeId);
+        const lastH = lastDef?.height || 60;
+
+        const totalSpan = last.y + lastH - first.y;
+        const sumCompHeights = sorted.reduce((sum, c) => {
+          const def = componentDefsMap.get(c.typeId);
+          return sum + (def?.height || 60);
+        }, 0);
+
+        const totalGap = totalSpan - sumCompHeights;
+        const gap = totalGap / (sorted.length - 1);
+
+        let curY = first.y;
+        const newPos = new Map<string, number>();
+
+        sorted.forEach((comp) => {
+          const def = componentDefsMap.get(comp.typeId);
+          const h = def?.height || 60;
+          newPos.set(comp.id, Math.round(curY));
+          curY += h + gap;
+        });
+
+        setProject((prev) => ({
+          ...prev,
+          components: prev.components.map((c) =>
+            newPos.has(c.id) ? { ...c, y: newPos.get(c.id)! } : c
+          ),
+        }));
+      }
+    },
+    [project, selectedComponentIds, componentDefsMap, pushToHistory]
+  );
+
+  // Handler: Autolayout feature (Grid-based automatic organization of all components)
+  const handleAutoLayout = useCallback(() => {
+    if (project.components.length === 0) return;
+    pushToHistory(project);
+
+    const reorganized = autoLayoutComponents(project.components, componentDefsMap, {
+      startX: 100,
+      startY: 80,
+      gapX: 45,
+      gapY: 55,
+      maxWidth: 1100,
+      snapGrid: snapToGrid ? 10 : 1,
+    });
+
+    setProject((prev) => ({
+      ...prev,
+      components: reorganized,
+    }));
+
+    setExportNotification('Kretsen ble automatisk organisert i et ryddig rutenett!');
+    setTimeout(() => setExportNotification(null), 3000);
+  }, [project, componentDefsMap, pushToHistory, snapToGrid]);
 
   // Handler: Interactive Component Click in Simulation
   const handleToggleComponentState = useCallback(
@@ -520,14 +768,14 @@ export default function App() {
       }
       // Delete selected
       else if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (selectedComponentId || selectedWireId) {
+        if (selectedComponentIds.length > 0 || selectedWireIds.length > 0) {
           handleDeleteSelected();
         }
       }
-      // Rotate selected component (R)
+      // Rotate selected component(s) (R)
       else if (e.key === 'r' || e.key === 'R') {
-        if (selectedComponentId) {
-          handleRotateComponent(selectedComponentId);
+        if (selectedComponentIds.length > 0) {
+          handleRotateComponent();
         }
       }
       // Toggle Snap-to-Grid (G)
@@ -544,6 +792,26 @@ export default function App() {
       else if (e.key === 'e' || e.key === 'E') {
         e.preventDefault();
         setIsERCWarningsOpen((prev) => !prev);
+      }
+      // Toggle Left Sidebar ([)
+      else if (e.key === '[') {
+        e.preventDefault();
+        setIsLeftSidebarOpen((prev) => !prev);
+      }
+      // Toggle Right Sidebar (])
+      else if (e.key === ']') {
+        e.preventDefault();
+        setIsRightSidebarOpen((prev) => !prev);
+      }
+      // Toggle Fullscreen Workspace (backslash \)
+      else if (e.key === '\\') {
+        e.preventDefault();
+        handleToggleFullScreenWorkspace();
+      }
+      // Autolayout: 'L' or 'l'
+      else if (e.key === 'l' || e.key === 'L') {
+        e.preventDefault();
+        handleAutoLayout();
       }
       // Zoom In (+ or =)
       else if (e.key === '+' || e.key === '=') {
@@ -563,14 +831,16 @@ export default function App() {
     handleDeleteSelected,
     handleRotateComponent,
     handleAddStickyNote,
-    selectedComponentId,
-    selectedWireId,
+    handleAutoLayout,
+    handleToggleFullScreenWorkspace,
+    selectedComponentIds,
+    selectedWireIds,
     handleZoomIn,
     handleZoomOut,
   ]);
 
   return (
-    <div className="flex flex-col w-screen h-screen overflow-hidden bg-slate-950 font-sans">
+    <div className="flex flex-col w-screen h-screen overflow-hidden bg-slate-950 font-sans touch-none select-none">
       {/* 1. Header Navigation Bar */}
       <HeaderBar
         projectName={project.name}
@@ -581,6 +851,7 @@ export default function App() {
         onOpenBOM={() => setIsBOMOpen(true)}
         onOpenProjects={() => setIsProjectsOpen(true)}
         onAddStickyNote={handleAddStickyNote}
+        onAutoLayout={handleAutoLayout}
         snapToGrid={snapToGrid}
         onToggleSnapToGrid={() => setSnapToGrid((prev) => !prev)}
         activeWireColor={activeWireColor}
@@ -591,6 +862,15 @@ export default function App() {
         lastSavedTime={lastSavedTime}
         isSaving={isSaving}
         onManualSave={handleManualSave}
+        onOpenLayers={() => setIsLayersOpen(true)}
+        onOpenPDFExport={() => setIsPDFExportOpen(true)}
+        onOpenImageExport={() => setIsImageExportOpen(true)}
+        isLeftSidebarOpen={isLeftSidebarOpen}
+        onToggleLeftSidebar={() => setIsLeftSidebarOpen((prev) => !prev)}
+        isRightSidebarOpen={isRightSidebarOpen}
+        onToggleRightSidebar={() => setIsRightSidebarOpen((prev) => !prev)}
+        isFullScreenWorkspace={isFullScreenWorkspace}
+        onToggleFullScreenWorkspace={handleToggleFullScreenWorkspace}
       />
 
       {/* Floating Export Notification Toast */}
@@ -603,25 +883,35 @@ export default function App() {
 
       {/* 2. Main Workspace Layout */}
       <div className="flex-1 flex overflow-hidden relative">
-        {/* Left: Component Catalog Sidebar (Collapsible) */}
+        {/* Left: Component Catalog Sidebar (Responsive: drawer on Android / mobile, static on desktop) */}
         {isLeftSidebarOpen && (
-          <ComponentSidebar
-            availableComponents={availableComponents}
-            onAddComponent={(typeId) => handleAddComponent(typeId)}
-            onOpenComponentEditor={() => setIsComponentEditorOpen(true)}
-            onOpenLibraryManager={() => setIsLibraryManagerOpen(true)}
-          />
+          <>
+            {/* Mobile / Android Backdrop */}
+            <div
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
+              onClick={() => setIsLeftSidebarOpen(false)}
+            />
+            <div className="fixed inset-y-0 left-0 z-50 md:relative md:z-auto h-full shadow-2xl md:shadow-none animate-in slide-in-from-left duration-200">
+              <ComponentSidebar
+                availableComponents={availableComponents}
+                onAddComponent={(typeId) => handleAddComponent(typeId)}
+                onOpenComponentEditor={() => setIsComponentEditorOpen(true)}
+                onOpenLibraryManager={() => setIsLibraryManagerOpen(true)}
+                onClose={() => setIsLeftSidebarOpen(false)}
+              />
+            </div>
+          </>
         )}
 
         {/* Collapsed Left Sidebar Toggle Tab */}
         {!isLeftSidebarOpen && (
           <button
             onClick={() => setIsLeftSidebarOpen(true)}
-            className="absolute left-0 top-1/2 -translate-y-1/2 z-30 p-2 bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white rounded-r-xl border-y border-r border-slate-700/80 shadow-xl transition flex items-center space-x-1"
-            title="Åpne Komponentbibliotek"
+            className="absolute left-0 top-1/2 -translate-y-1/2 z-30 flex flex-col items-center py-3 px-2 bg-slate-900/95 hover:bg-slate-800 text-slate-300 hover:text-white rounded-r-xl border-y border-r border-slate-700/80 shadow-2xl transition group cursor-pointer"
+            title="Åpne Komponentbibliotek (Hurtigtast: [ )"
           >
-            <PanelLeft className="w-4 h-4 text-blue-400" />
-            <span className="text-[10px] uppercase font-bold writing-mode-vertical">
+            <PanelLeft className="w-4 h-4 text-blue-400 group-hover:scale-110 transition mb-1.5" />
+            <span className="[writing-mode:vertical-rl] rotate-180 text-[10px] uppercase font-bold tracking-wider text-slate-300 group-hover:text-white">
               Bibliotek
             </span>
           </button>
@@ -629,7 +919,7 @@ export default function App() {
 
         {/* Center: Interactive Circuit Canvas & Floating Canvas Toolbar */}
         <main className="flex-1 h-full relative overflow-hidden">
-          {/* Canvas Toolbar (Undo, Redo, Zoom In, Zoom Out, Delete, Guide, Fullscreen, Theme, Export) */}
+          {/* Canvas Toolbar (Undo, Redo, Zoom In, Zoom Out, Delete, Guide, Fullscreen, Theme, Export, Layers, PDF, Bilde) */}
           <CanvasToolbar
             canUndo={historyPast.length > 0}
             canRedo={historyFuture.length > 0}
@@ -639,8 +929,9 @@ export default function App() {
             onZoomIn={handleZoomIn}
             onZoomOut={handleZoomOut}
             onResetZoom={handleResetZoom}
-            hasSelection={Boolean(selectedComponentId || selectedWireId)}
+            hasSelection={selectedComponentIds.length > 0 || selectedWireIds.length > 0}
             onDeleteSelected={handleDeleteSelected}
+            onAutoLayout={handleAutoLayout}
             isLeftSidebarOpen={isLeftSidebarOpen}
             onToggleLeftSidebar={() => setIsLeftSidebarOpen((prev) => !prev)}
             isRightSidebarOpen={isRightSidebarOpen}
@@ -651,15 +942,19 @@ export default function App() {
             canvasTheme={canvasTheme}
             onToggleCanvasTheme={handleToggleCanvasTheme}
             onExportJson={handleExportProjectJson}
+            onOpenLayers={() => setIsLayersOpen(true)}
+            onOpenPDFExport={() => setIsPDFExportOpen(true)}
+            onOpenImageExport={() => setIsImageExportOpen(true)}
           />
 
           <CircuitCanvas
             components={activeComponentsWithSim}
             wires={project.wires}
             notes={project.notes || []}
+            layers={projectLayers}
             componentDefs={componentDefsMap}
-            selectedComponentId={selectedComponentId}
-            selectedWireId={selectedWireId}
+            selectedComponentIds={selectedComponentIds}
+            selectedWireIds={selectedWireIds}
             activeWireColor={activeWireColor}
             isSimulating={isSimulating}
             activeWireIds={simulationResult.energizedWireIds}
@@ -671,12 +966,18 @@ export default function App() {
             onPanChange={setPan}
             onComponentDragEnd={handleComponentDragEnd}
             onSelectComponent={(id) => {
-              setSelectedComponentId(id);
-              if (id) setSelectedWireId(null);
+              setSelectedComponentIds(id ? [id] : []);
+              if (id) setSelectedWireIds([]);
+            }}
+            onSelectComponents={(ids) => {
+              setSelectedComponentIds(ids);
             }}
             onSelectWire={(id) => {
-              setSelectedWireId(id);
-              if (id) setSelectedComponentId(null);
+              setSelectedWireIds(id ? [id] : []);
+              if (id) setSelectedComponentIds([]);
+            }}
+            onSelectWires={(ids) => {
+              setSelectedWireIds(ids);
             }}
             onUpdateComponentPosition={handleUpdateComponentPosition}
             onAddWire={handleAddWire}
@@ -687,30 +988,49 @@ export default function App() {
           />
         </main>
 
-        {/* Right: Component Inspector & Properties (Collapsible) */}
+        {/* Right: Component Inspector & Alignment Controls (Responsive: drawer on Android / mobile, static on desktop) */}
         {isRightSidebarOpen && (
-          <ComponentInspector
-            selectedComponent={selectedComponent}
-            componentDef={selectedComponentDef}
-            isSimulating={isSimulating}
-            onUpdateComponent={handleUpdateComponent}
-            onRotateComponent={handleRotateComponent}
-            onDuplicateComponent={handleDuplicateComponent}
-            onDeleteComponent={handleDeleteComponent}
-          />
+          <>
+            {/* Mobile / Android Backdrop */}
+            <div
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
+              onClick={() => setIsRightSidebarOpen(false)}
+            />
+            <div className="fixed inset-y-0 right-0 z-50 md:relative md:z-auto h-full shadow-2xl md:shadow-none animate-in slide-in-from-right duration-200">
+              <ComponentInspector
+                selectedComponent={selectedComponent}
+                selectedComponents={selectedComponents}
+                componentDef={selectedComponentDef}
+                componentDefs={componentDefsMap}
+                layers={projectLayers}
+                isSimulating={isSimulating}
+                onUpdateComponent={handleUpdateComponent}
+                onRotateComponent={(id) => handleRotateComponent(id)}
+                onDuplicateComponent={(id) => handleDuplicateComponent(id)}
+                onDeleteComponent={(id) => handleDeleteComponent(id)}
+                onAlignComponents={handleAlignComponents}
+                onDistributeComponents={handleDistributeComponents}
+                onSelectComponentById={(id) => {
+                  setSelectedComponentIds([id]);
+                  setSelectedWireIds([]);
+                }}
+                onClose={() => setIsRightSidebarOpen(false)}
+              />
+            </div>
+          </>
         )}
 
         {/* Collapsed Right Sidebar Toggle Tab */}
         {!isRightSidebarOpen && (
           <button
             onClick={() => setIsRightSidebarOpen(true)}
-            className="absolute right-0 top-1/2 -translate-y-1/2 z-30 p-2 bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white rounded-l-xl border-y border-l border-slate-700/80 shadow-xl transition flex items-center space-x-1"
-            title="Åpne Egenskaper"
+            className="absolute right-0 top-1/2 -translate-y-1/2 z-30 flex flex-col items-center py-3 px-2 bg-slate-900/95 hover:bg-slate-800 text-slate-300 hover:text-white rounded-l-xl border-y border-l border-slate-700/80 shadow-2xl transition group cursor-pointer"
+            title="Åpne Egenskaper (Hurtigtast: ] )"
           >
-            <span className="text-[10px] uppercase font-bold writing-mode-vertical">
+            <PanelRight className="w-4 h-4 text-blue-400 group-hover:scale-110 transition mb-1.5" />
+            <span className="[writing-mode:vertical-rl] text-[10px] uppercase font-bold tracking-wider text-slate-300 group-hover:text-white">
               Egenskaper
             </span>
-            <PanelRight className="w-4 h-4 text-blue-400" />
           </button>
         )}
 
@@ -751,7 +1071,7 @@ export default function App() {
         isOpen={isERCWarningsOpen}
         onClose={() => setIsERCWarningsOpen(false)}
         warnings={simulationResult.warnings}
-        onSelectComponent={(compId) => setSelectedComponentId(compId)}
+        onSelectComponent={(compId) => setSelectedComponentIds([compId])}
       />
 
       <ProjectManagerModal
@@ -761,8 +1081,8 @@ export default function App() {
         onLoadProject={(loaded) => {
           pushToHistory(project);
           setProject(loaded);
-          setSelectedComponentId(null);
-          setSelectedWireId(null);
+          setSelectedComponentIds([]);
+          setSelectedWireIds([]);
         }}
         onNewEmptyProject={() => {
           pushToHistory(project);
@@ -786,9 +1106,35 @@ export default function App() {
             wires: [],
             notes: [],
           });
-          setSelectedComponentId(null);
-          setSelectedWireId(null);
+          setSelectedComponentIds([]);
+          setSelectedWireIds([]);
         }}
+      />
+
+      {/* Layer Management Drawer */}
+      <LayerManagerDrawer
+        isOpen={isLayersOpen}
+        onClose={() => setIsLayersOpen(false)}
+        layers={projectLayers}
+        project={project}
+        onUpdateLayers={handleUpdateLayers}
+        onMoveComponentsToLayer={handleMoveComponentsToLayer}
+      />
+
+      {/* PDF Export Modal */}
+      <PDFExportModal
+        isOpen={isPDFExportOpen}
+        onClose={() => setIsPDFExportOpen(false)}
+        project={project}
+        componentDefs={componentDefsMap}
+      />
+
+      {/* High-Res Image (PNG / SVG) Export Modal */}
+      <ImageExportModal
+        isOpen={isImageExportOpen}
+        onClose={() => setIsImageExportOpen(false)}
+        project={project}
+        componentDefs={componentDefsMap}
       />
     </div>
   );

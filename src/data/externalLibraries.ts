@@ -20,6 +20,7 @@ export const SAMPLE_SENSOR_LIBRARY: ExternalLibrary = {
       datasheetUrl: 'https://www.sparkfun.com/datasheets/Sensors/Proximity/HCSR04.pdf',
       packageShape: 'builtin',
       libraryId: 'lib_sensors_modules',
+      tags: ['sensor', 'ultralyd', 'avstand', 'ekko', 'sonar'],
       defaultProperties: {
         label: 'US1',
         readingCm: 25,
@@ -42,6 +43,7 @@ export const SAMPLE_SENSOR_LIBRARY: ExternalLibrary = {
       datasheetUrl: 'https://cdn-shop.adafruit.com/datasheets/SSD1306.pdf',
       packageShape: 'builtin',
       libraryId: 'lib_sensors_modules',
+      tags: ['skjerm', 'display', 'oled', 'i2c', '128x64', 'grafikk'],
       defaultProperties: {
         label: 'DISP1',
         displayText: 'CircuLab v1.0',
@@ -64,6 +66,7 @@ export const SAMPLE_SENSOR_LIBRARY: ExternalLibrary = {
       datasheetUrl: 'https://components101.com/switches/5v-single-channel-relay-module-pinout-features',
       packageShape: 'builtin',
       libraryId: 'lib_sensors_modules',
+      tags: ['relé', 'bryter', 'spole', 'aktuator', 'høyspent'],
       defaultProperties: {
         label: 'RELAY1',
         state: 'open',
@@ -87,6 +90,7 @@ export const SAMPLE_SENSOR_LIBRARY: ExternalLibrary = {
       description: 'Lysavhengig motstand med LM393 komparator for analog og digital utgang.',
       packageShape: 'builtin',
       libraryId: 'lib_sensors_modules',
+      tags: ['sensor', 'lys', 'ldr', 'fotomotstand', 'analog'],
       defaultProperties: {
         label: 'LDR1',
       },

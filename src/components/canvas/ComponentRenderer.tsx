@@ -5,6 +5,8 @@ import {
   PinDefinition,
 } from '../../types/circuit';
 import { getResistorColorBands, formatResistance } from '../../utils/resistorColors';
+import { SimulationTrendWidget } from './SimulationTrendWidget';
+import { VirtualOscilloscopeWidget } from './VirtualOscilloscopeWidget';
 
 interface ComponentRendererProps {
   component: CircuitComponentInstance;
@@ -36,12 +38,33 @@ export const ComponentRenderer: React.FC<ComponentRendererProps> = ({
   const simActive = component.state?.simActive || false;
   const simBurned = component.state?.simBurned || false;
 
+// Helper to parse breadboard coordinates into clean visual strings (e.g., A15, J2, +5, -12)
+function getBreadboardCoordLabel(pinId: string): string {
+  const rowMatch = pinId.match(/^row_([a-j])_(\d+)$/i);
+  if (rowMatch) {
+    return `${rowMatch[1].toUpperCase()}${rowMatch[2]}`;
+  }
+  const topPlus = pinId.match(/^top_plus_(\d+)$/);
+  if (topPlus) return `+${topPlus[1]}`;
+  const topMinus = pinId.match(/^top_minus_(\d+)$/);
+  if (topMinus) return `-${topMinus[1]}`;
+  const botPlus = pinId.match(/^bot_plus_(\d+)$/);
+  if (botPlus) return `+${botPlus[1]}`;
+  const botMinus = pinId.match(/^bot_minus_(\d+)$/);
+  if (botMinus) return `-${botMinus[1]}`;
+  return pinId;
+}
+
   // Render individual pins
   const renderPins = () => {
     // For breadboard, we render subtle pin hit targets
     const isBreadboard = definition.typeId === 'breadboard_half';
 
-    return definition.pins.map((pin) => {
+    const activeOrHoveredPin = isBreadboard
+      ? definition.pins.find((p) => p.id === activePinId || p.id === hoveredPinId)
+      : null;
+
+    const pinElements = definition.pins.map((pin) => {
       const isHovered = hoveredPinId === pin.id;
       const isActive = activePinId === pin.id;
 
@@ -62,6 +85,8 @@ export const ComponentRenderer: React.FC<ComponentRendererProps> = ({
       }
 
       if (isBreadboard) {
+        const coordLabel = getBreadboardCoordLabel(pin.id);
+
         return (
           <g
             key={pin.id}
@@ -73,6 +98,7 @@ export const ComponentRenderer: React.FC<ComponentRendererProps> = ({
             onMouseEnter={() => onPinMouseEnter?.(pin)}
             onMouseLeave={() => onPinMouseLeave?.(pin)}
           >
+            <title>{`${pin.name} [${coordLabel}]: ${pin.description || ''}`}</title>
             {/* Visual breadboard hole */}
             <circle cx={pin.x} cy={pin.y} r={3.2} fill="#334155" />
             <circle cx={pin.x} cy={pin.y} r={2.0} fill="#0f172a" />
@@ -89,9 +115,9 @@ export const ComponentRenderer: React.FC<ComponentRendererProps> = ({
             <circle
               cx={pin.x}
               cy={pin.y}
-              r={isHovered || isActive ? 7 : 5}
+              r={isHovered || isActive ? 7.5 : 5}
               fill={isActive ? '#3b82f6' : isHovered ? '#10b981' : 'transparent'}
-              opacity={isHovered || isActive ? 0.75 : 0}
+              opacity={isHovered || isActive ? 0.8 : 0}
               className="transition-all duration-100"
             />
           </g>
@@ -130,6 +156,75 @@ export const ComponentRenderer: React.FC<ComponentRendererProps> = ({
         </g>
       );
     });
+
+    // If breadboard pin is hovered or active, render top-layer coordinate badge
+    if (isBreadboard && activeOrHoveredPin) {
+      const pin = activeOrHoveredPin;
+      const coord = getBreadboardCoordLabel(pin.id);
+      const isActive = activePinId === pin.id;
+      const arrowPoints =
+        pin.y > 60
+          ? `${pin.x - 3},${pin.y - 7} ${pin.x + 3},${pin.y - 7} ${pin.x},${pin.y - 3}`
+          : `${pin.x - 3},${pin.y + 7} ${pin.x + 3},${pin.y + 7} ${pin.x},${pin.y + 3}`;
+
+      return (
+        <>
+          {pinElements}
+          {/* Floating coordinate tooltip badge */}
+          <g className="pointer-events-none select-none z-50">
+            {/* Guide crosshairs */}
+            <line
+              x1={pin.x}
+              y1={10}
+              x2={pin.x}
+              y2={220}
+              stroke={isActive ? '#3b82f6' : '#10b981'}
+              strokeWidth={1}
+              strokeDasharray="2 2"
+              opacity={0.4}
+            />
+            <line
+              x1={20}
+              y1={pin.y}
+              x2={425}
+              y2={pin.y}
+              stroke={isActive ? '#3b82f6' : '#10b981'}
+              strokeWidth={1}
+              strokeDasharray="2 2"
+              opacity={0.4}
+            />
+
+            {/* Badge pill */}
+            <rect
+              x={pin.x - 17}
+              y={pin.y > 60 ? pin.y - 22 : pin.y + 8}
+              width={34}
+              height={14}
+              rx={3.5}
+              fill="#0f172a"
+              stroke={isActive ? '#3b82f6' : '#10b981'}
+              strokeWidth={1.5}
+              filter="drop-shadow(0 2px 4px rgba(0,0,0,0.6))"
+            />
+            <polygon points={arrowPoints} fill={isActive ? '#3b82f6' : '#10b981'} />
+            <text
+              x={pin.x}
+              y={pin.y > 60 ? pin.y - 15 : pin.y + 15}
+              fill="#ffffff"
+              fontSize={8}
+              fontWeight="bold"
+              fontFamily="ui-monospace, monospace"
+              textAnchor="middle"
+              dominantBaseline="central"
+            >
+              {coord}
+            </text>
+          </g>
+        </>
+      );
+    }
+
+    return pinElements;
   };
 
   // Render specific component visual artwork
@@ -317,8 +412,26 @@ export const ComponentRenderer: React.FC<ComponentRendererProps> = ({
         );
       }
 
-      // 3. KOBLINGSBRETT (Breadboard 400 tie points)
+      // 3. KOBLINGSBRETT (Breadboard 400 tie points with visual A-J and 1-30 coordinate labels)
       case 'breadboard_half': {
+        const rowsTop = [
+          { letter: 'A', y: 56 },
+          { letter: 'B', y: 68 },
+          { letter: 'C', y: 80 },
+          { letter: 'D', y: 92 },
+          { letter: 'E', y: 104 },
+        ];
+        const rowsBot = [
+          { letter: 'F', y: 124 },
+          { letter: 'G', y: 136 },
+          { letter: 'H', y: 148 },
+          { letter: 'I', y: 160 },
+          { letter: 'J', y: 172 },
+        ];
+
+        // 30 columns
+        const allCols = Array.from({ length: 30 }, (_, i) => i + 1);
+
         return (
           <g>
             {/* Breadboard Plastic Body */}
@@ -331,78 +444,279 @@ export const ComponentRenderer: React.FC<ComponentRendererProps> = ({
               fill="#f8fafc"
               stroke="#e2e8f0"
               strokeWidth={3}
-              filter="drop-shadow(0 6px 12px rgba(0,0,0,0.15))"
+              filter="drop-shadow(0 6px 14px rgba(0,0,0,0.14))"
             />
 
-            {/* Interlocking tabs on side */}
+            {/* Interlocking tabs on side (Left & Right) */}
             <path d="M 0 50 L -6 56 L -6 70 L 0 76 Z" fill="#f8fafc" stroke="#e2e8f0" />
             <path d="M 0 150 L -6 156 L -6 170 L 0 176 Z" fill="#f8fafc" stroke="#e2e8f0" />
             <path d="M 445 50 L 451 56 L 451 70 L 445 76 Z" fill="#f8fafc" stroke="#e2e8f0" />
             <path d="M 445 150 L 451 156 L 451 170 L 445 176 Z" fill="#f8fafc" stroke="#e2e8f0" />
 
+            {/* 5-Hole Terminal Grouping Lanes (A-E and F-J) to visualize connected nodes */}
+            {allCols.map((c) => {
+              const xPos = 35 + (c - 1) * 13;
+              return (
+                <React.Fragment key={`lane_${c}`}>
+                  {/* Top 5-hole lane (Rows A-E) */}
+                  <rect
+                    x={xPos - 4.5}
+                    y={51}
+                    width={9}
+                    height={58}
+                    rx={4.5}
+                    fill="#f1f5f9"
+                    opacity={0.7}
+                  />
+                  {/* Bottom 5-hole lane (Rows F-J) */}
+                  <rect
+                    x={xPos - 4.5}
+                    y={119}
+                    width={9}
+                    height={58}
+                    rx={4.5}
+                    fill="#f1f5f9"
+                    opacity={0.7}
+                  />
+                </React.Fragment>
+              );
+            })}
+
             {/* Top Power Rail Lines */}
             {/* Red Line (+) */}
             <line x1={30} y1={12} x2={420} y2={12} stroke="#ef4444" strokeWidth={2.5} strokeLinecap="round" />
-            <text x={18} y={21} fill="#ef4444" fontSize={13} fontWeight="bold" textAnchor="middle">+</text>
-            <text x={430} y={21} fill="#ef4444" fontSize={13} fontWeight="bold" textAnchor="middle">+</text>
-
             {/* Blue Line (-) */}
             <line x1={30} y1={40} x2={420} y2={40} stroke="#3b82f6" strokeWidth={2.5} strokeLinecap="round" />
-            <text x={18} y={37} fill="#3b82f6" fontSize={15} fontWeight="bold" textAnchor="middle">-</text>
-            <text x={430} y={37} fill="#3b82f6" fontSize={15} fontWeight="bold" textAnchor="middle">-</text>
+
+            {/* Top Power Rail Polarity Markers */}
+            <text x={18} y={19} fill="#ef4444" fontSize={13} fontWeight="bold" textAnchor="middle">+</text>
+            <text x={430} y={19} fill="#ef4444" fontSize={13} fontWeight="bold" textAnchor="middle">+</text>
+            <text x={18} y={38} fill="#3b82f6" fontSize={15} fontWeight="bold" textAnchor="middle">-</text>
+            <text x={430} y={38} fill="#3b82f6" fontSize={15} fontWeight="bold" textAnchor="middle">-</text>
+
+            {/* Subtle top power rail labels */}
+            <text x={35} y={8} fill="#ef4444" fontSize={6.5} fontWeight="bold" letterSpacing={0.5}>+ 5V / VCC</text>
+            <text x={415} y={8} fill="#3b82f6" fontSize={6.5} fontWeight="bold" textAnchor="end" letterSpacing={0.5}>- GND</text>
+
+            {/* Periodic Power Rail Indicators (at col 10, 20, 30) */}
+            {[10, 20, 30].map((col) => {
+              const xPos = 35 + (col - 1) * 13;
+              return (
+                <React.Fragment key={`pwr_top_${col}`}>
+                  <text x={xPos} y={10} fill="#ef4444" fontSize={7.5} fontWeight="bold" textAnchor="middle">+</text>
+                  <text x={xPos} y={43} fill="#3b82f6" fontSize={9} fontWeight="bold" textAnchor="middle">-</text>
+                </React.Fragment>
+              );
+            })}
 
             {/* Bottom Power Rail Lines */}
             {/* Red Line (+) */}
             <line x1={30} y1={188} x2={420} y2={188} stroke="#ef4444" strokeWidth={2.5} strokeLinecap="round" />
-            <text x={18} y={197} fill="#ef4444" fontSize={13} fontWeight="bold" textAnchor="middle">+</text>
-            <text x={430} y={197} fill="#ef4444" fontSize={13} fontWeight="bold" textAnchor="middle">+</text>
-
             {/* Blue Line (-) */}
             <line x1={30} y1={216} x2={420} y2={216} stroke="#3b82f6" strokeWidth={2.5} strokeLinecap="round" />
-            <text x={18} y={213} fill="#3b82f6" fontSize={15} fontWeight="bold" textAnchor="middle">-</text>
-            <text x={430} y={213} fill="#3b82f6" fontSize={15} fontWeight="bold" textAnchor="middle">-</text>
 
-            {/* Center Ravine (DIP Divider) */}
+            {/* Bottom Power Rail Polarity Markers */}
+            <text x={18} y={195} fill="#ef4444" fontSize={13} fontWeight="bold" textAnchor="middle">+</text>
+            <text x={430} y={195} fill="#ef4444" fontSize={13} fontWeight="bold" textAnchor="middle">+</text>
+            <text x={18} y={214} fill="#3b82f6" fontSize={15} fontWeight="bold" textAnchor="middle">-</text>
+            <text x={430} y={214} fill="#3b82f6" fontSize={15} fontWeight="bold" textAnchor="middle">-</text>
+
+            {/* Periodic Bottom Power Rail Indicators (at col 10, 20, 30) */}
+            {[10, 20, 30].map((col) => {
+              const xPos = 35 + (col - 1) * 13;
+              return (
+                <React.Fragment key={`pwr_bot_${col}`}>
+                  <text x={xPos} y={186} fill="#ef4444" fontSize={7.5} fontWeight="bold" textAnchor="middle">+</text>
+                  <text x={xPos} y={220} fill="#3b82f6" fontSize={9} fontWeight="bold" textAnchor="middle">-</text>
+                </React.Fragment>
+              );
+            })}
+
+            {/* Center Ravine (DIP IC Divider) */}
             <rect x={20} y={109} width={405} height={8} fill="#e2e8f0" rx={2} />
             <line x1={22} y1={113} x2={423} y2={113} stroke="#cbd5e1" strokeWidth={1} />
 
-            {/* Row Letters (A, B, C, D, E and F, G, H, I, J) */}
-            {['a', 'b', 'c', 'd', 'e'].map((letter, idx) => (
-              <React.Fragment key={letter}>
-                <text x={18} y={60 + idx * 12} fill="#64748b" fontSize={9} fontWeight="bold" textAnchor="middle">
-                  {letter.toUpperCase()}
-                </text>
-                <text x={430} y={60 + idx * 12} fill="#64748b" fontSize={9} fontWeight="bold" textAnchor="middle">
-                  {letter.toUpperCase()}
-                </text>
-              </React.Fragment>
-            ))}
+            {/* Center Ravine Alignment Ticks and Column Markers */}
+            {allCols.map((c) => {
+              const xPos = 35 + (c - 1) * 13;
+              const isMajor = c === 1 || c % 5 === 0;
+              return (
+                <React.Fragment key={`ravine_${c}`}>
+                  {isMajor ? (
+                    <circle cx={xPos} cy={113} r={1.5} fill="#94a3b8" />
+                  ) : (
+                    <line x1={xPos} y1={112} x2={xPos} y2={114} stroke="#cbd5e1" strokeWidth={1} />
+                  )}
+                </React.Fragment>
+              );
+            })}
 
-            {['f', 'g', 'h', 'i', 'j'].map((letter, idx) => (
-              <React.Fragment key={letter}>
-                <text x={18} y={128 + idx * 12} fill="#64748b" fontSize={9} fontWeight="bold" textAnchor="middle">
-                  {letter.toUpperCase()}
-                </text>
-                <text x={430} y={128 + idx * 12} fill="#64748b" fontSize={9} fontWeight="bold" textAnchor="middle">
-                  {letter.toUpperCase()}
-                </text>
-              </React.Fragment>
-            ))}
-
-            {/* Column Numbers (1, 5, 10, 15, 20, 25, 30) */}
+            {/* Center Ravine Column numbers at 1, 5, 10, 15, 20, 25, 30 for easy IC alignment */}
             {[1, 5, 10, 15, 20, 25, 30].map((col) => {
               const xPos = 35 + (col - 1) * 13;
               return (
-                <React.Fragment key={col}>
-                  <text x={xPos} y={50} fill="#94a3b8" fontSize={8} fontWeight="bold" textAnchor="middle">
-                    {col}
-                  </text>
-                  <text x={xPos} y={180} fill="#94a3b8" fontSize={8} fontWeight="bold" textAnchor="middle">
+                <text
+                  key={`ravine_txt_${col}`}
+                  x={xPos}
+                  y={113}
+                  fill="#64748b"
+                  fontSize={6}
+                  fontWeight="bold"
+                  fontFamily="ui-monospace, monospace"
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                >
+                  {col}
+                </text>
+              );
+            })}
+
+            {/* Silkscreen Badges behind Row Letters on Left and Right for High Contrast */}
+            <rect x={11} y={49} width={14} height={60} rx={3} fill="#f1f5f9" stroke="#e2e8f0" strokeWidth={0.75} />
+            <rect x={11} y={117} width={14} height={60} rx={3} fill="#f1f5f9" stroke="#e2e8f0" strokeWidth={0.75} />
+            <rect x={421} y={49} width={14} height={60} rx={3} fill="#f1f5f9" stroke="#e2e8f0" strokeWidth={0.75} />
+            <rect x={421} y={117} width={14} height={60} rx={3} fill="#f1f5f9" stroke="#e2e8f0" strokeWidth={0.75} />
+
+            {/* Row Letters (A, B, C, D, E) - Left & Right Margins */}
+            {rowsTop.map((row) => (
+              <React.Fragment key={`row_top_${row.letter}`}>
+                {/* Left side */}
+                <text
+                  x={18}
+                  y={row.y}
+                  fill="#334155"
+                  fontSize={9}
+                  fontWeight="bold"
+                  fontFamily="ui-monospace, monospace"
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                >
+                  {row.letter}
+                </text>
+                {/* Right side */}
+                <text
+                  x={428}
+                  y={row.y}
+                  fill="#334155"
+                  fontSize={9}
+                  fontWeight="bold"
+                  fontFamily="ui-monospace, monospace"
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                >
+                  {row.letter}
+                </text>
+              </React.Fragment>
+            ))}
+
+            {/* Row Letters (F, G, H, I, J) - Left & Right Margins */}
+            {rowsBot.map((row) => (
+              <React.Fragment key={`row_bot_${row.letter}`}>
+                {/* Left side */}
+                <text
+                  x={18}
+                  y={row.y}
+                  fill="#334155"
+                  fontSize={9}
+                  fontWeight="bold"
+                  fontFamily="ui-monospace, monospace"
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                >
+                  {row.letter}
+                </text>
+                {/* Right side */}
+                <text
+                  x={428}
+                  y={row.y}
+                  fill="#334155"
+                  fontSize={9}
+                  fontWeight="bold"
+                  fontFamily="ui-monospace, monospace"
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                >
+                  {row.letter}
+                </text>
+              </React.Fragment>
+            ))}
+
+            {/* Column Coordinate Labels (1 to 30) - Top Rail (above Row A) */}
+            {allCols.map((col) => {
+              const xPos = 35 + (col - 1) * 13;
+              const isMajor = col === 1 || col % 5 === 0;
+
+              return (
+                <React.Fragment key={`col_top_${col}`}>
+                  {/* Tick mark pointing into column */}
+                  <line
+                    x1={xPos}
+                    y1={isMajor ? 49.5 : 50.5}
+                    x2={xPos}
+                    y2={52.5}
+                    stroke={isMajor ? '#475569' : '#94a3b8'}
+                    strokeWidth={isMajor ? 1 : 0.75}
+                  />
+                  {/* Number label */}
+                  <text
+                    x={xPos}
+                    y={47.5}
+                    fill={isMajor ? '#0f172a' : '#64748b'}
+                    fontSize={isMajor ? 7.5 : 6.5}
+                    fontWeight={isMajor ? 'bold' : '600'}
+                    fontFamily="ui-monospace, monospace"
+                    textAnchor="middle"
+                  >
                     {col}
                   </text>
                 </React.Fragment>
               );
             })}
+
+            {/* Column Coordinate Labels (1 to 30) - Bottom Rail (below Row J) */}
+            {allCols.map((col) => {
+              const xPos = 35 + (col - 1) * 13;
+              const isMajor = col === 1 || col % 5 === 0;
+
+              return (
+                <React.Fragment key={`col_bot_${col}`}>
+                  {/* Tick mark pointing into column */}
+                  <line
+                    x1={xPos}
+                    y1={175.5}
+                    x2={xPos}
+                    y2={isMajor ? 178.5 : 177.5}
+                    stroke={isMajor ? '#475569' : '#94a3b8'}
+                    strokeWidth={isMajor ? 1 : 0.75}
+                  />
+                  {/* Number label */}
+                  <text
+                    x={xPos}
+                    y={185}
+                    fill={isMajor ? '#0f172a' : '#64748b'}
+                    fontSize={isMajor ? 7.5 : 6.5}
+                    fontWeight={isMajor ? 'bold' : '600'}
+                    fontFamily="ui-monospace, monospace"
+                    textAnchor="middle"
+                  >
+                    {col}
+                  </text>
+                </React.Fragment>
+              );
+            })}
+
+            {/* Bottom Brand Silkscreen */}
+            <text
+              x={223}
+              y={226}
+              fill="#94a3b8"
+              fontSize={7.5}
+              fontWeight="bold"
+              letterSpacing={1.2}
+              textAnchor="middle"
+            >
+              CIRCULAB • BB-400 TIE-POINTS
+            </text>
           </g>
         );
       }
@@ -740,6 +1054,51 @@ export const ComponentRenderer: React.FC<ComponentRendererProps> = ({
             <text x={50} y={62} fill="#38bdf8" fontSize={7} fontFamily="monospace" textAnchor="middle">
               128x64 OLED
             </text>
+          </g>
+        );
+      }
+
+      // 12. SIMULERINGSTREND (Oscilloskop & graf widget)
+      case 'simulation_trend': {
+        return (
+          <g>
+            <foreignObject
+              x={0}
+              y={0}
+              width={width}
+              height={height}
+              className="overflow-visible pointer-events-auto"
+            >
+              <SimulationTrendWidget
+                component={component}
+                definition={definition}
+                isSimulating={isSimulating}
+                simVoltage={component.state?.simVoltage}
+              />
+            </foreignObject>
+          </g>
+        );
+      }
+
+      // 13. VIRTUELT OSCILLOSKOP (DSO Instrument)
+      case 'virtual_oscilloscope': {
+        return (
+          <g>
+            <foreignObject
+              x={0}
+              y={0}
+              width={width}
+              height={height}
+              className="overflow-visible pointer-events-auto"
+            >
+              <VirtualOscilloscopeWidget
+                component={component}
+                definition={definition}
+                isSimulating={isSimulating}
+                simVoltageCh1={component.state?.simVoltage}
+                simVoltageCh2={component.state?.simVoltageCh2}
+              />
+            </foreignObject>
           </g>
         );
       }

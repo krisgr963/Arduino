@@ -5,7 +5,7 @@ import {
   PinDefinition,
   PinType,
 } from '../../types/circuit';
-import { X, Plus, Trash2, Cpu, Eye, Save, Sparkles } from 'lucide-react';
+import { X, Plus, Trash2, Cpu, Eye, Save, Sparkles, Tag } from 'lucide-react';
 
 interface ComponentEditorModalProps {
   isOpen: boolean;
@@ -22,6 +22,8 @@ export const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
   const [category, setCategory] = useState<ComponentCategory>('Custom');
   const [description, setDescription] = useState('');
   const [datasheetUrl, setDatasheetUrl] = useState('');
+  const [tags, setTags] = useState<string[]>(['custom', 'modul']);
+  const [tagInput, setTagInput] = useState('');
   const [width, setWidth] = useState(140);
   const [height, setHeight] = useState(100);
   const [bodyColor, setBodyColor] = useState('#1e293b');
@@ -103,6 +105,37 @@ export const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
     setPins(updated);
   };
 
+  const handleAddTag = (tagToAdd?: string) => {
+    const raw = tagToAdd || tagInput;
+    const clean = raw.trim().toLowerCase().replace(/^#+/, '').replace(/[^a-z0-9_æøå-]/gi, '');
+    if (!clean) return;
+    if (!tags.includes(clean)) {
+      setTags([...tags, clean]);
+    }
+    setTagInput('');
+  };
+
+  const handleRemoveTag = (tagToRemove: string) => {
+    setTags(tags.filter((t) => t !== tagToRemove));
+  };
+
+  const SUGGESTED_TAGS = [
+    'sensor',
+    'ic',
+    'i2c',
+    'spi',
+    'analog',
+    'digital',
+    '3.3v',
+    '5v',
+    'aktuator',
+    'display',
+    'strøm',
+    'trådløs',
+    'bryter',
+    'egen',
+  ];
+
   const handleSave = () => {
     if (!name.trim()) {
       alert('Vennligst oppgi et navn på komponenten.');
@@ -119,6 +152,7 @@ export const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
       datasheetUrl: datasheetUrl.trim() || undefined,
       customColor: bodyColor,
       isCustom: true,
+      tags: tags.length > 0 ? tags : ['custom'],
       pins,
       packageShape: 'custom',
       defaultProperties: {
@@ -269,6 +303,92 @@ export const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
                 placeholder="https://example.com/datasheet.pdf"
                 className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
               />
+            </div>
+
+            {/* Merkelapper (Tags) */}
+            <div className="pt-2 border-t border-slate-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="flex items-center space-x-1.5 text-xs font-medium text-slate-300">
+                  <Tag className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Merkelapper (Tags)</span>
+                </label>
+                <span className="text-[10px] text-slate-500 font-mono">
+                  {tags.length} {tags.length === 1 ? 'merkelapp' : 'merkelapper'}
+                </span>
+              </div>
+
+              {/* Tag Input Field */}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ',') {
+                      e.preventDefault();
+                      handleAddTag();
+                    }
+                  }}
+                  placeholder="Legg til merkelapp (f.eks. i2c, sensor, 5v)..."
+                  className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleAddTag()}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-blue-400 hover:text-blue-300 border border-slate-700 rounded-lg text-xs font-medium flex items-center space-x-1 transition"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Legg til</span>
+                </button>
+              </div>
+
+              {/* Active Tags Pills */}
+              {tags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {tags.map((t) => (
+                    <span
+                      key={t}
+                      className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md text-[11px] font-mono bg-blue-500/15 text-blue-300 border border-blue-500/30"
+                    >
+                      <span>#{t}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveTag(t)}
+                        className="hover:text-red-400 transition ml-0.5"
+                        title={`Fjern merkelapp #${t}`}
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Suggested Tags */}
+              <div className="pt-1">
+                <span className="text-[10px] text-slate-400 uppercase tracking-wider block mb-1">
+                  Hurtigvalg forslag:
+                </span>
+                <div className="flex flex-wrap gap-1">
+                  {SUGGESTED_TAGS.map((stag) => {
+                    const isSelected = tags.includes(stag);
+                    return (
+                      <button
+                        key={stag}
+                        type="button"
+                        onClick={() => (isSelected ? handleRemoveTag(stag) : handleAddTag(stag))}
+                        className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition border ${
+                          isSelected
+                            ? 'bg-blue-600/30 text-blue-300 border-blue-500/50'
+                            : 'bg-slate-800/60 text-slate-400 border-slate-700/60 hover:text-slate-200 hover:bg-slate-700/60'
+                        }`}
+                      >
+                        {isSelected ? '✓ ' : '+'}#{stag}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
 
             {/* Pin Management */}
@@ -447,6 +567,20 @@ export const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
                   );
                 })}
               </svg>
+
+              {/* Tags preview underneath SVG */}
+              {tags.length > 0 && (
+                <div className="flex flex-wrap items-center justify-center gap-1.5 mt-3 max-w-xs">
+                  {tags.map((t) => (
+                    <span
+                      key={t}
+                      className="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-800/90 text-blue-400 border border-slate-700 shadow-sm"
+                    >
+                      #{t}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
 
             <p className="text-xs text-slate-400 mt-2 text-center">

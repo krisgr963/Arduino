@@ -1,5 +1,8 @@
 export type PinType = 'power' | 'ground' | 'digital_io' | 'analog' | 'passive' | 'signal';
 
+export type AlignmentType = 'left' | 'center-h' | 'right' | 'top' | 'center-v' | 'bottom';
+export type DistributionType = 'horizontal' | 'vertical';
+
 export interface PinDefinition {
   id: string;
   name: string;
@@ -52,7 +55,48 @@ export interface ComponentDefinition {
   libraryId?: string;
   author?: string;
   version?: string;
+  tags?: string[];
 }
+
+export interface CircuitLayer {
+  id: string;
+  name: string;
+  color: string;
+  visible: boolean;
+  locked: boolean;
+  description?: string;
+  isDefault?: boolean;
+}
+
+export const DEFAULT_LAYERS: CircuitLayer[] = [
+  {
+    id: 'layer_components',
+    name: 'Komponenter',
+    color: '#3b82f6',
+    visible: true,
+    locked: false,
+    description: 'Mikrokontrollere, sensorer, IC-er og passive komponenter',
+    isDefault: true,
+  },
+  {
+    id: 'layer_wires',
+    name: 'Ledninger & Koblinger',
+    color: '#10b981',
+    visible: true,
+    locked: false,
+    description: 'Kretsbaner og koblingsledninger mellom pinner',
+    isDefault: true,
+  },
+  {
+    id: 'layer_notes',
+    name: 'Notater & Klistrelapper',
+    color: '#f59e0b',
+    visible: true,
+    locked: false,
+    description: 'Gule klistrelapper og dokumentasjonsmerknader',
+    isDefault: true,
+  },
+];
 
 export interface CircuitComponentInstance {
   id: string;
@@ -64,10 +108,12 @@ export interface CircuitComponentInstance {
   properties: Record<string, any>;
   notes?: string;
   datasheetUrl?: string;
+  layerId?: string; // ID of the layer this component belongs to (defaults to layer_components)
   state?: {
     isPressed?: boolean; // for push button
     simActive?: boolean; // e.g. LED shining
     simVoltage?: number;
+    simVoltageCh2?: number;
     simCurrent?: number;
     simBurned?: boolean; // blown LED due to overcurrent
   };
@@ -81,6 +127,7 @@ export interface WireConnection {
   toPinId: string;
   color: string;
   curvature?: number; // for realistic curved jumper wire sag
+  layerId?: string; // ID of the layer this wire belongs to (defaults to layer_wires)
 }
 
 export interface StickyNote {
@@ -91,6 +138,7 @@ export interface StickyNote {
   height: number;
   text: string;
   color: string;
+  layerId?: string; // ID of the layer this note belongs to (defaults to layer_notes)
 }
 
 export interface CircuitProject {
@@ -103,6 +151,7 @@ export interface CircuitProject {
   components: CircuitComponentInstance[];
   wires: WireConnection[];
   notes?: StickyNote[];
+  layers?: CircuitLayer[];
 }
 
 export interface ExternalLibrary {

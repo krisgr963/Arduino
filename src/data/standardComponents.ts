@@ -112,6 +112,7 @@ export const STANDARD_COMPONENTS: ComponentDefinition[] = [
     description: 'Klassisk mikrokontroller-kort basert på ATmega328P med 14 digitale I/O-pinner og 6 analoge innganger.',
     datasheetUrl: 'https://docs.arduino.cc/hardware/uno-rev3',
     packageShape: 'builtin',
+    tags: ['mikrokontroller', 'arduino', 'atmega328p', '5v', 'usb', 'programmering'],
     defaultProperties: {
       voltage: '5V',
       label: 'ARDUINO1',
@@ -161,6 +162,7 @@ export const STANDARD_COMPONENTS: ComponentDefinition[] = [
     description: '32-bit to-kjerners Wi-Fi & Bluetooth mikrokontroller (NodeMCU-32S kompatibel).',
     datasheetUrl: 'https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf',
     packageShape: 'builtin',
+    tags: ['mikrokontroller', 'esp32', 'wifi', 'bluetooth', 'iot', '3.3v'],
     defaultProperties: {
       voltage: '3.3V',
       label: 'ESP32_1',
@@ -209,6 +211,7 @@ export const STANDARD_COMPONENTS: ComponentDefinition[] = [
     height: 228,
     description: 'Halv-størrelse prototypingsbrett med to strømskinner (+/-) og 30 sammenkoblede 5-punkts rekker.',
     packageShape: 'builtin',
+    tags: ['koblingsbrett', 'prototype', 'breadboard', '400-punkter'],
     defaultProperties: {
       label: 'BB1',
     },
@@ -225,6 +228,7 @@ export const STANDARD_COMPONENTS: ComponentDefinition[] = [
     description: 'Standard 5mm lysdiode. Krever en seriemotstand for å beskytte mot for høy strøm.',
     datasheetUrl: 'https://en.wikipedia.org/wiki/Light-emitting_diode',
     packageShape: 'builtin',
+    tags: ['led', 'diode', 'indikator', 'lys', 'optisk'],
     defaultProperties: {
       color: '#ef4444',
       label: 'LED1',
@@ -263,6 +267,7 @@ export const STANDARD_COMPONENTS: ComponentDefinition[] = [
     description: 'Gjennomhulls karbonfilmmotstand med fargebånd for strømbegrensning eller spenningsdeler.',
     datasheetUrl: 'https://en.wikipedia.org/wiki/Resistor',
     packageShape: 'builtin',
+    tags: ['motstand', 'resistor', 'passiv', 'strømbegrenser', 'ohm'],
     defaultProperties: {
       resistance: 330,
       label: 'R1',
@@ -301,6 +306,7 @@ export const STANDARD_COMPONENTS: ComponentDefinition[] = [
     description: 'Midlertidig trykkbryter (momentary switch). Kobler sammen de to sidene når den trykkes.',
     datasheetUrl: 'https://en.wikipedia.org/wiki/Push-button',
     packageShape: 'builtin',
+    tags: ['knapp', 'bryter', 'inngang', 'taktil', 'momentan'],
     defaultProperties: {
       label: 'SW1',
     },
@@ -322,6 +328,7 @@ export const STANDARD_COMPONENTS: ComponentDefinition[] = [
     description: 'Standard 9V alkalisk blokkbatteri (PP3) med snap-kontakter.',
     datasheetUrl: 'https://en.wikipedia.org/wiki/Nine-volt_battery',
     packageShape: 'builtin',
+    tags: ['batteri', 'strøm', '9v', 'dc', 'strømkilde'],
     defaultProperties: {
       voltage: 9.0,
       label: 'BAT1',
@@ -341,6 +348,7 @@ export const STANDARD_COMPONENTS: ComponentDefinition[] = [
     height: 80,
     description: 'Batteriholder med 3x 1.5V AA-batterier som gir totalt 4.5V likestrøm.',
     packageShape: 'builtin',
+    tags: ['batteri', 'strøm', '4.5v', 'aa', 'batteripakke'],
     defaultProperties: {
       voltage: 4.5,
       label: 'BAT_AA',
@@ -360,6 +368,7 @@ export const STANDARD_COMPONENTS: ComponentDefinition[] = [
     height: 80,
     description: 'Roterbart potensiometer med 3 pinner for å justere spenning eller analogt signal.',
     packageShape: 'builtin',
+    tags: ['potensiometer', 'pot', 'variabel', 'analog', 'volum'],
     defaultProperties: {
       maxResistance: 10000,
       valueRatio: 0.5,
@@ -392,6 +401,7 @@ export const STANDARD_COMPONENTS: ComponentDefinition[] = [
     height: 65,
     description: 'Akustisk piezo-element som genererer lyd ved tilkoblet likespenning eller PWM.',
     packageShape: 'builtin',
+    tags: ['buzzer', 'summer', 'lyd', 'tone', 'alarm', 'piezo'],
     defaultProperties: {
       label: 'BZ1',
       nominalVoltage: 5.0,
@@ -411,6 +421,7 @@ export const STANDARD_COMPONENTS: ComponentDefinition[] = [
     height: 38,
     description: 'En-polet vekselbryter med 3 pinner (Common, A, B) for å slå av/på kretser.',
     packageShape: 'builtin',
+    tags: ['skyvebryter', 'bryter', 'spdt', 'on-off', 'veksler'],
     defaultProperties: {
       label: 'SW_SLIDE',
       activePosition: 'A', // 'A' or 'B'
@@ -433,4 +444,151 @@ export const STANDARD_COMPONENTS: ComponentDefinition[] = [
       { id: 'pin_b', name: 'Pinne B', type: 'passive', x: 55, y: 32, description: 'Kontakt B' },
     ],
   },
+
+  // 12. SIMULERINGSTREND (Oscilloskop & Spenningsgraf)
+  {
+    typeId: 'simulation_trend',
+    name: 'Simuleringstrend (Oscilloskop)',
+    category: 'Sensors',
+    width: 260,
+    height: 190,
+    description:
+      'Sanntids spenningstrend og oscilloskop-graf widget. Koble Probe-pinnen til et målepunkt i kretsen for å plotte spenningsforløp over tid ved hjelp av recharts.',
+    packageShape: 'builtin',
+    tags: ['trend', 'graf', 'oscilloskop', 'måler', 'recharts', 'spenning', 'scope', 'signal', 'simuleringstrend'],
+    defaultProperties: {
+      label: 'TREND1',
+      sampleRate: 250,
+      scale: '5V',
+    },
+    pins: [
+      {
+        id: 'probe',
+        name: 'Probe (Målepinne)',
+        type: 'analog',
+        x: 48,
+        y: 182,
+        description: 'Målepinne for spenning (kobles til målepunkt)',
+      },
+      {
+        id: 'gnd',
+        name: 'GND (Jordreferanse)',
+        type: 'ground',
+        x: 220,
+        y: 182,
+        description: 'Jordreferanse (0V)',
+      },
+    ],
+  },
+
+  // 13. VIRTUELT OSCILLOSKOP (DSO - Digital Storage Oscilloscope)
+  {
+    typeId: 'virtual_oscilloscope',
+    name: 'Virtuelt Oscilloskop (DSO)',
+    category: 'Sensors',
+    width: 320,
+    height: 240,
+    description:
+      'Virtuelt benktopp-oscilloskop for sanntids bølgeform- og spenningsvisualisering. Støtter to kanaler (CH1 Gul og CH2 Cyan), justerbar tidsbase (Time/Div), spenningsskala (Volts/Div), triggermodus, bølgeform-generator og automatisk måling av Vpp, Vrms, Vavg og frekvens.',
+    packageShape: 'builtin',
+    tags: [
+      'oscilloskop',
+      'scope',
+      'dso',
+      'signal',
+      'graf',
+      'bølgeform',
+      'spenning',
+      'måleinstrument',
+      'instrument',
+      'tektronix',
+      'rigol',
+      'frekvens',
+    ],
+    defaultProperties: {
+      label: 'DSO1',
+      timeDiv: '50ms',
+      voltsDivCh1: '2V',
+      voltsDivCh2: '2V',
+      signalMode: 'live',
+      triggerMode: 'auto',
+      frequencyHz: 50,
+    },
+    propertyDefinitions: [
+      {
+        key: 'signalMode',
+        label: 'Signalmodus',
+        type: 'select',
+        defaultValue: 'live',
+        options: [
+          { label: 'Sanntid Krets (DC / Pulser)', value: 'live' },
+          { label: 'AC Sinusbølge (50 Hz)', value: 'sine' },
+          { label: 'PWM Firkantbølge (100 Hz)', value: 'square' },
+          { label: 'Trekantbølge', value: 'triangle' },
+        ],
+      },
+      {
+        key: 'timeDiv',
+        label: 'Tidsbase (Time/Div)',
+        type: 'select',
+        defaultValue: '50ms',
+        options: [
+          { label: '10 ms / div', value: '10ms' },
+          { label: '25 ms / div', value: '25ms' },
+          { label: '50 ms / div', value: '50ms' },
+          { label: '100 ms / div', value: '100ms' },
+          { label: '250 ms / div', value: '250ms' },
+          { label: '500 ms / div', value: '500ms' },
+        ],
+      },
+      {
+        key: 'voltsDivCh1',
+        label: 'CH1 Skala (Volt/Div)',
+        type: 'select',
+        defaultValue: '2V',
+        options: [
+          { label: '0.5 V / div', value: '0.5V' },
+          { label: '1.0 V / div', value: '1V' },
+          { label: '2.0 V / div', value: '2V' },
+          { label: '5.0 V / div', value: '5V' },
+          { label: '10.0 V / div', value: '10V' },
+        ],
+      },
+    ],
+    pins: [
+      {
+        id: 'ch1',
+        name: 'CH1 Inngang (Gul BNC)',
+        type: 'analog',
+        x: 55,
+        y: 232,
+        description: 'Kanal 1 inngangsterminal (Måler kretsspenning)',
+      },
+      {
+        id: 'ch2',
+        name: 'CH2 Inngang (Blå BNC)',
+        type: 'analog',
+        x: 135,
+        y: 232,
+        description: 'Kanal 2 inngangsterminal (Måler sekundær spenning)',
+      },
+      {
+        id: 'gnd',
+        name: 'GND (Jordreferanse)',
+        type: 'ground',
+        x: 215,
+        y: 232,
+        description: 'Jordreferanse for oscilloskopprober (0V)',
+      },
+      {
+        id: 'cal_out',
+        name: 'CAL (1kHz Testutgang)',
+        type: 'signal',
+        x: 285,
+        y: 232,
+        description: 'Innebygd 1kHz 3.3V referansetestsignal',
+      },
+    ],
+  },
 ];
+

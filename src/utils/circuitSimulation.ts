@@ -44,6 +44,7 @@ export interface SimulationResult {
     {
       simActive: boolean;
       simVoltage?: number;
+      simVoltageCh2?: number;
       simCurrent?: number;
       simBurned?: boolean;
       statusText?: string;
@@ -251,16 +252,7 @@ export function analyzeCircuit(
   });
 
   // 6. Component-specific checks & simulation states
-  const activeComponents: Record<
-    string,
-    {
-      simActive: boolean;
-      simVoltage?: number;
-      simCurrent?: number;
-      simBurned?: boolean;
-      statusText?: string;
-    }
-  > = {};
+  const activeComponents: SimulationResult['activeComponents'] = {};
 
   const energizedWireIds = new Set<string>();
 
@@ -421,6 +413,85 @@ export function analyzeCircuit(
       activeComponents[comp.id] = {
         simActive: isPressed,
         statusText: isPressed ? 'Trykket inn (Lukket krets)' : 'Åpen bryter',
+      };
+    }
+
+    // Virtual Oscilloscope & Simulation Trend
+    if (comp.typeId === 'virtual_oscilloscope' || comp.typeId === 'simulation_trend') {
+      const isOsc = comp.typeId === 'virtual_oscilloscope';
+      const ch1PinId = isOsc ? 'ch1' : 'probe';
+      const ch2PinId = 'ch2';
+
+      // Helper to compute node voltage for a given pin
+      const getPinVoltage = (pinId: string) => {
+        const root = dsu.find(pinKey(comp.id, pinId));
+        let volt = 0;
+        const isPower = netIsPower.get(root) ?? false;
+        const isGnd = netIsGround.get(root) ?? false;
+        const netV = netVoltages.get(root);
+
+        if (isPower && netV !== undefined) {
+          volt = netV;
+        } else if (isGnd) {
+          volt = 0.0;
+        }
+
+        // Check if connected to LED, Potentiometer, or Microcontroller pin
+        components.forEach((c) => {
+          if (c.typeId === 'led_5mm') {
+            const ledSim = activeComponents[c.id];
+            if (ledSim?.simActive) {
+              const anodeR = dsu.find(pinKey(c.id, 'anode'));
+              const cathodeR = dsu.find(pinKey(c.id, 'cathode'));
+              if (root === anodeR) {
+                volt = Math.max(volt, 2.0);
+              } else if (root === cathodeR) {
+                volt = 0.0;
+              }
+            }
+          }
+          if (c.typeId === 'potentiometer') {
+            const wiperR = dsu.find(pinKey(c.id, 'wiper'));
+            if (root === wiperR) {
+              const p1R = dsu.find(pinKey(c.id, 'pin1'));
+              const p1Power = netIsPower.get(p1R);
+              const supply = (p1Power ? netVoltages.get(p1R) : 5.0) || 5.0;
+              const slider = Number(c.properties.sliderPosition) || 0.5;
+              volt = +(supply * slider).toFixed(2);
+            }
+          }
+        });
+
+        const isWireConnected = wires.some(
+          (w) =>
+            (w.fromComponentId === comp.id && w.fromPinId === pinId) ||
+            (w.toComponentId === comp.id && w.toPinId === pinId)
+        );
+
+        return { volt: isWireConnected ? volt : 0, isConnected: isWireConnected };
+      };
+
+      const ch1Result = getPinVoltage(ch1PinId);
+      const ch2Result = isOsc ? getPinVoltage(ch2PinId) : { volt: 0, isConnected: false };
+
+      const hasConnection = ch1Result.isConnected || ch2Result.isConnected;
+
+      let statusMsg = '';
+      if (ch1Result.isConnected && ch2Result.isConnected) {
+        statusMsg = `CH1: ${ch1Result.volt.toFixed(2)}V | CH2: ${ch2Result.volt.toFixed(2)}V`;
+      } else if (ch1Result.isConnected) {
+        statusMsg = `CH1: ${ch1Result.volt.toFixed(2)}V`;
+      } else if (ch2Result.isConnected) {
+        statusMsg = `CH2: ${ch2Result.volt.toFixed(2)}V`;
+      } else {
+        statusMsg = 'Prober ikke tilkoblet';
+      }
+
+      activeComponents[comp.id] = {
+        simActive: hasConnection,
+        simVoltage: ch1Result.volt,
+        simVoltageCh2: ch2Result.volt,
+        statusText: statusMsg,
       };
     }
   });
