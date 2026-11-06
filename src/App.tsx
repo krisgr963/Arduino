@@ -21,6 +21,7 @@ import {
 import { PRESET_PROJECTS } from './data/presetProjects';
 import { analyzeCircuit } from './utils/circuitSimulation';
 import { autoLayoutComponents } from './utils/autoLayout';
+import { autoRouteCircuitWires } from './utils/autoRouteWires';
 import { CircuitCanvas } from './components/canvas/CircuitCanvas';
 import { HeaderBar } from './components/toolbar/HeaderBar';
 import { CanvasToolbar } from './components/toolbar/CanvasToolbar';
@@ -228,7 +229,28 @@ export default function App() {
 
   // 6. Interactive Simulation State
   const [isSimulating, setIsSimulating] = useState<boolean>(false);
+  const [simulationSpeed, setSimulationSpeed] = useState<number>(1.0);
+  const [simulationClockTick, setSimulationClockTick] = useState<number>(0);
   const [buttonPressedStates, setButtonPressedStates] = useState<Record<string, boolean>>({});
+
+  // Clock tick interval generator for logic simulation, scaled by simulationSpeed
+  useEffect(() => {
+    if (!isSimulating) {
+      setSimulationClockTick(0);
+      return;
+    }
+
+    // Base interval is 400ms at 1.0x speed.
+    // e.g. at 0.25x speed => 1600ms (slow motion logic observation).
+    // at 2.0x speed => 200ms.
+    // at 5.0x speed => 80ms.
+    const intervalMs = Math.max(35, Math.round(400 / simulationSpeed));
+    const timer = setInterval(() => {
+      setSimulationClockTick((prev) => (prev + 1) % 1000000);
+    }, intervalMs);
+
+    return () => clearInterval(timer);
+  }, [isSimulating, simulationSpeed]);
 
   // 7. Modals State
   const [isComponentEditorOpen, setIsComponentEditorOpen] = useState(false);
@@ -283,9 +305,10 @@ export default function App() {
       project.components,
       project.wires,
       componentDefsMap,
-      isSimulating ? buttonPressedStates : {}
+      isSimulating ? buttonPressedStates : {},
+      simulationClockTick
     );
-  }, [project.components, project.wires, componentDefsMap, isSimulating, buttonPressedStates]);
+  }, [project.components, project.wires, componentDefsMap, isSimulating, buttonPressedStates, simulationClockTick]);
 
   // Merge computed simulation states into component instances
   const activeComponentsWithSim = useMemo(() => {
@@ -685,6 +708,38 @@ export default function App() {
     setTimeout(() => setExportNotification(null), 3000);
   }, [project, componentDefsMap, pushToHistory, snapToGrid]);
 
+  // Handler: Auto-route Wires
+  const handleAutoRouteWires = useCallback(() => {
+    if (!project.wires || project.wires.length === 0) {
+      setExportNotification('Ingen ledninger å rute.');
+      setTimeout(() => setExportNotification(null), 2500);
+      return;
+    }
+
+    pushToHistory(project);
+    const result = autoRouteCircuitWires(
+      project.wires,
+      project.components,
+      componentDefsMap,
+      {
+        mode: 'direct',
+        selectedWireIds: selectedWireIds.length > 0 ? selectedWireIds : undefined,
+      }
+    );
+
+    setProject((prev) => ({
+      ...prev,
+      wires: result.updatedWires,
+    }));
+
+    setExportNotification(
+      `Auto-rutet ${result.routedCount} ${
+        result.routedCount === 1 ? 'ledning' : 'ledninger'
+      } med direkte, ryddige stier!`
+    );
+    setTimeout(() => setExportNotification(null), 3000);
+  }, [project, componentDefsMap, selectedWireIds, pushToHistory]);
+
   // Handler: Interactive Component Click in Simulation
   const handleToggleComponentState = useCallback(
     (compId: string) => {
@@ -772,10 +827,12 @@ export default function App() {
           handleDeleteSelected();
         }
       }
-      // Rotate selected component(s) (R)
+      // Rotate selected component(s) (R) or Auto-route wires when nothing selected
       else if (e.key === 'r' || e.key === 'R') {
         if (selectedComponentIds.length > 0) {
           handleRotateComponent();
+        } else {
+          handleAutoRouteWires();
         }
       }
       // Toggle Snap-to-Grid (G)
@@ -830,6 +887,7 @@ export default function App() {
     handleRedo,
     handleDeleteSelected,
     handleRotateComponent,
+    handleAutoRouteWires,
     handleAddStickyNote,
     handleAutoLayout,
     handleToggleFullScreenWorkspace,
@@ -846,12 +904,15 @@ export default function App() {
         projectName={project.name}
         isSimulating={isSimulating}
         onToggleSimulation={() => setIsSimulating((prev) => !prev)}
+        simulationSpeed={simulationSpeed}
+        onChangeSimulationSpeed={setSimulationSpeed}
         warnings={simulationResult.warnings}
         onOpenERCWarnings={() => setIsERCWarningsOpen(true)}
         onOpenBOM={() => setIsBOMOpen(true)}
         onOpenProjects={() => setIsProjectsOpen(true)}
         onAddStickyNote={handleAddStickyNote}
         onAutoLayout={handleAutoLayout}
+        onAutoRouteWires={handleAutoRouteWires}
         snapToGrid={snapToGrid}
         onToggleSnapToGrid={() => setSnapToGrid((prev) => !prev)}
         activeWireColor={activeWireColor}
@@ -932,6 +993,7 @@ export default function App() {
             hasSelection={selectedComponentIds.length > 0 || selectedWireIds.length > 0}
             onDeleteSelected={handleDeleteSelected}
             onAutoLayout={handleAutoLayout}
+            onAutoRouteWires={handleAutoRouteWires}
             isLeftSidebarOpen={isLeftSidebarOpen}
             onToggleLeftSidebar={() => setIsLeftSidebarOpen((prev) => !prev)}
             isRightSidebarOpen={isRightSidebarOpen}
@@ -957,6 +1019,7 @@ export default function App() {
             selectedWireIds={selectedWireIds}
             activeWireColor={activeWireColor}
             isSimulating={isSimulating}
+            simulationSpeed={simulationSpeed}
             activeWireIds={simulationResult.energizedWireIds}
             snapToGrid={snapToGrid}
             canvasTheme={canvasTheme}

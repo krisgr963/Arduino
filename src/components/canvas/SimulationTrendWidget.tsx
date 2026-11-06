@@ -14,6 +14,7 @@ interface SimulationTrendWidgetProps {
   component: CircuitComponentInstance;
   definition: ComponentDefinition;
   isSimulating: boolean;
+  simulationSpeed?: number;
   simVoltage?: number;
 }
 
@@ -27,6 +28,7 @@ export const SimulationTrendWidget: React.FC<SimulationTrendWidgetProps> = ({
   component,
   definition,
   isSimulating,
+  simulationSpeed = 1.0,
   simVoltage = 0,
 }) => {
   const [samples, setSamples] = useState<SamplePoint[]>(() => {
@@ -46,10 +48,11 @@ export const SimulationTrendWidget: React.FC<SimulationTrendWidgetProps> = ({
   const [yScaleMax, setYScaleMax] = useState<number>(5.5); // 5V default, can toggle to 10V
   const sampleCounterRef = useRef<number>(15);
 
-  // Samplings-loop: Kjører når simulering er aktiv og grafen ikke er pauset
+  // Samplings-loop: Kjører når simulering er aktiv og grafen ikke er pauset, skalert med simulationSpeed
   useEffect(() => {
     if (!isSimulating || isPaused) return;
 
+    const sampleInterval = Math.max(30, Math.round(250 / (simulationSpeed || 1.0)));
     const interval = setInterval(() => {
       const idx = sampleCounterRef.current++;
       const timeSec = (idx * 0.25).toFixed(1);
@@ -66,10 +69,10 @@ export const SimulationTrendWidget: React.FC<SimulationTrendWidgetProps> = ({
         }
         return next;
       });
-    }, 250);
+    }, sampleInterval);
 
     return () => clearInterval(interval);
-  }, [isSimulating, isPaused, simVoltage]);
+  }, [isSimulating, isPaused, simVoltage, simulationSpeed]);
 
   // Beregn min, maks og snittspenning
   const stats = useMemo(() => {

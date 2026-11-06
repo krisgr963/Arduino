@@ -127,6 +127,8 @@ export interface WireConnection {
   toPinId: string;
   color: string;
   curvature?: number; // for realistic curved jumper wire sag
+  routingMode?: 'direct' | 'orthogonal' | 'curved'; // routing mode
+  waypoints?: { x: number; y: number }[]; // intermediate routing points for orthogonal / routed paths
   layerId?: string; // ID of the layer this wire belongs to (defaults to layer_wires)
 }
 

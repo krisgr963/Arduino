@@ -20,6 +20,8 @@ import {
   Sparkles,
   PanelRightClose,
   Lock,
+  Eye,
+  FileText,
 } from 'lucide-react';
 import { Tooltip } from '../common/Tooltip';
 import { DatasheetPreviewCard } from './DatasheetPreviewCard';
@@ -702,18 +704,46 @@ export const ComponentInspector: React.FC<ComponentInspectorProps> = ({
             </div>
           </div>
 
-          {/* Embedded Datasheet Preview Card with Excerpt & Technical Specs */}
-          {(selectedComponent.datasheetUrl || componentDef.datasheetUrl) && (
-            <div className="pt-1">
-              <DatasheetPreviewCard
-                selectedComponent={selectedComponent}
-                componentDef={componentDef}
-                datasheetUrl={selectedComponent.datasheetUrl || componentDef.datasheetUrl}
-                onOpenExternal={() => {
-                  const url = selectedComponent.datasheetUrl || componentDef.datasheetUrl;
-                  if (url) window.open(url, '_blank', 'noopener,noreferrer');
-                }}
-              />
+        </div>
+
+        {/* Dedikert 'Forhåndsvisning'-seksjon for Datablad, Utdrag og Skjema */}
+        <div className="space-y-2.5 pt-2 border-t border-slate-800">
+          <div className="flex items-center justify-between">
+            <h4 className="text-[11px] font-bold text-slate-300 uppercase tracking-wider flex items-center space-x-1.5">
+              <Eye className="w-3.5 h-3.5 text-blue-400" />
+              <span>Forhåndsvisning</span>
+            </h4>
+            {(selectedComponent.datasheetUrl || componentDef.datasheetUrl) ? (
+              <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 font-semibold flex items-center space-x-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Dokumentasjon aktiv</span>
+              </span>
+            ) : (
+              <span className="text-[10px] text-slate-500">Ingen datablad valgt</span>
+            )}
+          </div>
+
+          {(selectedComponent.datasheetUrl || componentDef.datasheetUrl) ? (
+            <DatasheetPreviewCard
+              selectedComponent={selectedComponent}
+              componentDef={componentDef}
+              datasheetUrl={selectedComponent.datasheetUrl || componentDef.datasheetUrl}
+              onOpenExternal={() => {
+                const url = selectedComponent.datasheetUrl || componentDef.datasheetUrl;
+                if (url) window.open(url, '_blank', 'noopener,noreferrer');
+              }}
+            />
+          ) : (
+            <div className="bg-slate-900/60 border border-dashed border-slate-700/80 rounded-xl p-3 text-center space-y-1.5 text-slate-400">
+              <div className="flex justify-center text-slate-500">
+                <FileText className="w-5 h-5" />
+              </div>
+              <p className="text-[11px] text-slate-300 font-medium">
+                Ingen datablad-lenke er definert ennå
+              </p>
+              <p className="text-[10px] text-slate-500 leading-normal">
+                Skriv eller lim inn en URL i feltet ovenfor for å se teknisk utdrag, skjematisk tegning eller iframe-forhåndsvisning.
+              </p>
             </div>
           )}
         </div>

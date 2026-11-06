@@ -24,22 +24,35 @@ export const WireRenderer: React.FC<WireRendererProps> = ({
   isSimulating,
   onSelectWire,
 }) => {
-  // Compute curved Bezier path for realistic Fritzing wire droop
-  const dx = toX - fromX;
-  const dy = toY - fromY;
-  const distance = Math.sqrt(dx * dx + dy * dy);
+  // Compute path data based on routingMode and curvature
+  let pathData = '';
 
-  // Perpendicular vector for natural wire bow
-  const nx = -dy / (distance || 1);
-  const ny = dx / (distance || 1);
+  if (wire.routingMode === 'orthogonal' && wire.waypoints && wire.waypoints.length > 0) {
+    pathData =
+      `M ${fromX} ${fromY} ` +
+      wire.waypoints.map((wp) => `L ${wp.x} ${wp.y}`).join(' ') +
+      ` L ${toX} ${toY}`;
+  } else if (wire.curvature === 0 || wire.routingMode === 'direct' && wire.curvature === 0) {
+    // Pure direct straight path between pins
+    pathData = `M ${fromX} ${fromY} L ${toX} ${toY}`;
+  } else {
+    // Compute curved Bezier path for realistic Fritzing wire droop
+    const dx = toX - fromX;
+    const dy = toY - fromY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
 
-  // User or default curvature
-  const curvature = wire.curvature !== undefined ? wire.curvature : Math.min(35, distance * 0.15);
+    // Perpendicular vector for natural wire bow
+    const nx = -dy / (distance || 1);
+    const ny = dx / (distance || 1);
 
-  const midX = (fromX + toX) / 2 + nx * curvature;
-  const midY = (fromY + toY) / 2 + ny * curvature;
+    // User or default curvature
+    const curvature = wire.curvature !== undefined ? wire.curvature : Math.min(35, distance * 0.15);
 
-  const pathData = `M ${fromX} ${fromY} Q ${midX} ${midY} ${toX} ${toY}`;
+    const midX = (fromX + toX) / 2 + nx * curvature;
+    const midY = (fromY + toY) / 2 + ny * curvature;
+
+    pathData = `M ${fromX} ${fromY} Q ${midX} ${midY} ${toX} ${toY}`;
+  }
 
   return (
     <g

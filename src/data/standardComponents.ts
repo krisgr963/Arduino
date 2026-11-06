@@ -210,6 +210,7 @@ export const STANDARD_COMPONENTS: ComponentDefinition[] = [
     width: 445,
     height: 228,
     description: 'Halv-størrelse prototypingsbrett med to strømskinner (+/-) og 30 sammenkoblede 5-punkts rekker.',
+    datasheetUrl: 'https://en.wikipedia.org/wiki/Breadboard',
     packageShape: 'builtin',
     tags: ['koblingsbrett', 'prototype', 'breadboard', '400-punkter'],
     defaultProperties: {
@@ -367,6 +368,7 @@ export const STANDARD_COMPONENTS: ComponentDefinition[] = [
     width: 70,
     height: 80,
     description: 'Roterbart potensiometer med 3 pinner for å justere spenning eller analogt signal.',
+    datasheetUrl: 'https://en.wikipedia.org/wiki/Potentiometer',
     packageShape: 'builtin',
     tags: ['potensiometer', 'pot', 'variabel', 'analog', 'volum'],
     defaultProperties: {
@@ -400,6 +402,7 @@ export const STANDARD_COMPONENTS: ComponentDefinition[] = [
     width: 65,
     height: 65,
     description: 'Akustisk piezo-element som genererer lyd ved tilkoblet likespenning eller PWM.',
+    datasheetUrl: 'https://en.wikipedia.org/wiki/Buzzer',
     packageShape: 'builtin',
     tags: ['buzzer', 'summer', 'lyd', 'tone', 'alarm', 'piezo'],
     defaultProperties: {
@@ -420,6 +423,7 @@ export const STANDARD_COMPONENTS: ComponentDefinition[] = [
     width: 70,
     height: 38,
     description: 'En-polet vekselbryter med 3 pinner (Common, A, B) for å slå av/på kretser.',
+    datasheetUrl: 'https://en.wikipedia.org/wiki/Switch',
     packageShape: 'builtin',
     tags: ['skyvebryter', 'bryter', 'spdt', 'on-off', 'veksler'],
     defaultProperties: {
@@ -588,6 +592,68 @@ export const STANDARD_COMPONENTS: ComponentDefinition[] = [
         y: 232,
         description: 'Innebygd 1kHz 3.3V referansetestsignal',
       },
+    ],
+  },
+
+  // 14. NE555 TIMER IC (DIP-8 Astabil / Monostabil Oscillator)
+  {
+    typeId: 'ic_555',
+    name: 'NE555 Timer IC (DIP-8)',
+    category: 'Passive',
+    width: 76,
+    height: 64,
+    description:
+      'Klassisk 555 presisjonstimer i DIP-8 pakke. Kan konfigureres som astabil multivibrator for blinkende LED eller som pulsbreddegenerator.',
+    datasheetUrl: 'https://www.ti.com/lit/ds/symlink/ne555.pdf',
+    packageShape: 'builtin',
+    tags: [
+      '555',
+      'timer',
+      'ne555',
+      'astabil',
+      'oscillator',
+      'puls',
+      'ic',
+      'dip8',
+      'klokke',
+      'multivibrator',
+      'blinkende',
+    ],
+    defaultProperties: {
+      label: 'U1 (NE555)',
+      mode: 'astable',
+    },
+    pins: [
+      { id: 'pin1', name: 'GND (Pin 1)', type: 'ground', x: 10, y: 12, description: 'Jordreferanse (0V)' },
+      { id: 'pin2', name: 'TRIG (Pin 2)', type: 'analog', x: 10, y: 24, description: 'Trigger inngang (1/3 VCC)' },
+      { id: 'pin3', name: 'OUT (Pin 3)', type: 'digital_io', x: 10, y: 36, description: 'Pulsutgang til last/LED' },
+      { id: 'pin4', name: 'RESET (Pin 4)', type: 'digital_io', x: 10, y: 48, description: 'Reset (aktiv lav)' },
+      { id: 'pin5', name: 'CTRL (Pin 5)', type: 'analog', x: 66, y: 48, description: 'Kontrollspenning (2/3 VCC)' },
+      { id: 'pin6', name: 'THRESH (Pin 6)', type: 'analog', x: 66, y: 36, description: 'Terskelspenning (2/3 VCC)' },
+      { id: 'pin7', name: 'DISCH (Pin 7)', type: 'passive', x: 66, y: 24, description: 'Utlading via timing-motstand' },
+      { id: 'pin8', name: 'VCC (Pin 8)', type: 'power', x: 66, y: 12, description: 'Driftsspenning (+4.5V til +15V)' },
+    ],
+  },
+
+  // 15. ELEKTROLYTTKONDENSATOR
+  {
+    typeId: 'capacitor_electrolytic',
+    name: 'Elektrolyttkondensator (10µF)',
+    category: 'Passive',
+    width: 50,
+    height: 55,
+    description: 'Polarisert elektrolyttkondensator for timing, filtrering og avkobling i kretser.',
+    datasheetUrl: 'https://en.wikipedia.org/wiki/Electrolytic_capacitor',
+    packageShape: 'builtin',
+    tags: ['kondensator', 'capacitor', 'elko', '10uf', 'filter', 'timing', 'avkopling'],
+    defaultProperties: {
+      label: 'C1',
+      capacitance: '10uF',
+      voltageRating: '25V',
+    },
+    pins: [
+      { id: 'anode', name: 'Anode (+)', type: 'passive', x: 16, y: 48, description: 'Positiv pol (+)' },
+      { id: 'cathode', name: 'Katode (-)', type: 'passive', x: 34, y: 48, description: 'Negativ pol (-)' },
     ],
   },
 ];

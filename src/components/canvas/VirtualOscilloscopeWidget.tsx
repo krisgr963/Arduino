@@ -6,6 +6,7 @@ interface VirtualOscilloscopeWidgetProps {
   component: CircuitComponentInstance;
   definition: ComponentDefinition;
   isSimulating: boolean;
+  simulationSpeed?: number;
   simVoltageCh1?: number;
   simVoltageCh2?: number;
 }
@@ -20,6 +21,7 @@ export const VirtualOscilloscopeWidget: React.FC<VirtualOscilloscopeWidgetProps>
   component,
   definition,
   isSimulating,
+  simulationSpeed = 1.0,
   simVoltageCh1 = 0,
   simVoltageCh2 = 0,
 }) => {
@@ -51,25 +53,33 @@ export const VirtualOscilloscopeWidget: React.FC<VirtualOscilloscopeWidgetProps>
 
   const tickCounterRef = useRef<number>(0);
 
-  // Time multiplier based on timeDiv
+  // Time multiplier based on timeDiv and simulationSpeed
   const speedMs = useMemo(() => {
+    let base = 65;
     switch (timeDiv) {
       case '10ms':
-        return 30;
+        base = 30;
+        break;
       case '25ms':
-        return 45;
+        base = 45;
+        break;
       case '50ms':
-        return 65;
+        base = 65;
+        break;
       case '100ms':
-        return 100;
+        base = 100;
+        break;
       case '250ms':
-        return 160;
+        base = 160;
+        break;
       case '500ms':
-        return 220;
+        base = 220;
+        break;
       default:
-        return 65;
+        base = 65;
     }
-  }, [timeDiv]);
+    return Math.max(16, Math.round(base / (simulationSpeed || 1.0)));
+  }, [timeDiv, simulationSpeed]);
 
   // Real-time animation / sampling loop
   useEffect(() => {

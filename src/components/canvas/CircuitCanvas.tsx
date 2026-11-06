@@ -23,6 +23,7 @@ interface CircuitCanvasProps {
   selectedWireIds?: string[];
   activeWireColor: string;
   isSimulating: boolean;
+  simulationSpeed?: number;
   activeWireIds: Set<string>;
   snapToGrid: boolean;
   gridSize?: number;
@@ -60,6 +61,7 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({
   selectedWireIds,
   activeWireColor,
   isSimulating,
+  simulationSpeed = 1.0,
   activeWireIds,
   snapToGrid,
   gridSize = 10,
@@ -931,6 +933,7 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({
                     definition={def}
                     isSelected={isCompSelected}
                     isSimulating={isSimulating}
+                    simulationSpeed={simulationSpeed}
                     hoveredPinId={hoveredPin?.componentId === comp.id ? hoveredPin.pinId : null}
                     activePinId={
                       drawingWireSource?.componentId === comp.id ? drawingWireSource.pin.id : null

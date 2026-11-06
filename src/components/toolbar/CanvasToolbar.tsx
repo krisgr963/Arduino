@@ -18,6 +18,7 @@ import {
   Layers,
   FileText,
   Image as ImageIcon,
+  Route,
 } from 'lucide-react';
 import { Tooltip } from '../common/Tooltip';
 
@@ -33,6 +34,7 @@ interface CanvasToolbarProps {
   hasSelection: boolean;
   onDeleteSelected: () => void;
   onAutoLayout?: () => void;
+  onAutoRouteWires?: () => void;
   isLeftSidebarOpen: boolean;
   onToggleLeftSidebar: () => void;
   isRightSidebarOpen: boolean;
@@ -60,6 +62,7 @@ export const CanvasToolbar: React.FC<CanvasToolbarProps> = ({
   hasSelection,
   onDeleteSelected,
   onAutoLayout,
+  onAutoRouteWires,
   isLeftSidebarOpen,
   onToggleLeftSidebar,
   isRightSidebarOpen,
@@ -208,6 +211,25 @@ export const CanvasToolbar: React.FC<CanvasToolbarProps> = ({
           >
             <LayoutGrid className="w-4 h-4 text-cyan-400" />
             <span className="hidden sm:inline text-[11px] font-medium">Autolayout</span>
+          </button>
+        </Tooltip>
+      )}
+
+      {/* 3c. Auto-route Wires Button */}
+      {onAutoRouteWires && (
+        <Tooltip
+          title="Auto-route ledninger"
+          description="Finner den mest direkte og ryddige stien mellom pinner for å rydde opp i komplekse koblinger"
+          shortcut="R"
+          position="bottom"
+        >
+          <button
+            onClick={onAutoRouteWires}
+            className="p-1.5 rounded-lg flex items-center space-x-1 text-xs hover:bg-slate-800 text-slate-300 hover:text-emerald-300 transition"
+            aria-label="Auto-route ledninger"
+          >
+            <Route className="w-4 h-4 text-emerald-400" />
+            <span className="hidden sm:inline text-[11px] font-medium">Auto-route</span>
           </button>
         </Tooltip>
       )}

@@ -57,7 +57,8 @@ export function analyzeCircuit(
   components: CircuitComponentInstance[],
   wires: WireConnection[],
   componentDefs: Map<string, ComponentDefinition>,
-  buttonPressedStates: Record<string, boolean> = {}
+  buttonPressedStates: Record<string, boolean> = {},
+  clockTick: number = 0
 ): SimulationResult {
   const dsu = createDSU();
   const pinKey = (compId: string, pinId: string) => `${compId}:${pinId}`;
@@ -178,9 +179,23 @@ export function analyzeCircuit(
       } else if (comp.typeId === 'arduino_uno' && pinId === 'v5') {
         maxVoltage = Math.max(maxVoltage, 5.0);
         hasPower = true;
+      } else if (comp.typeId === 'arduino_uno' && (pinId === 'd9' || pinId === 'd10' || pinId === 'd11' || pinId === 'd13')) {
+        // Dynamic PWM / logic pulse modulated by clockTick
+        const isPulseHigh = clockTick === 0 || (clockTick % 2 === 0);
+        if (isPulseHigh) {
+          maxVoltage = Math.max(maxVoltage, 5.0);
+          hasPower = true;
+        }
       } else if (comp.typeId === 'arduino_uno' && pinId === 'v33') {
         maxVoltage = Math.max(maxVoltage, 3.3);
         hasPower = true;
+      } else if (comp.typeId === 'ic_555' && pinId === 'pin3') {
+        // NE555 astable oscillator pulse modulated by clockTick
+        const isPulseHigh = clockTick === 0 || (clockTick % 2 === 0);
+        if (isPulseHigh) {
+          maxVoltage = Math.max(maxVoltage, 5.0);
+          hasPower = true;
+        }
       } else if (comp.typeId === 'esp32_devkit' && (pinId === 'vin' || pinId === '3v3')) {
         maxVoltage = Math.max(maxVoltage, pinId === '3v3' ? 3.3 : 5.0);
         hasPower = true;
@@ -191,7 +206,8 @@ export function analyzeCircuit(
         (comp.typeId === 'battery_9v' && pinId === 'neg') ||
         (comp.typeId === 'battery_aa_pack' && pinId === 'neg') ||
         (comp.typeId === 'arduino_uno' && (pinId === 'gnd_top' || pinId === 'gnd_bot1' || pinId === 'gnd_bot2')) ||
-        (comp.typeId === 'esp32_devkit' && (pinId === 'gnd_l' || pinId === 'gnd_r'))
+        (comp.typeId === 'esp32_devkit' && (pinId === 'gnd_l' || pinId === 'gnd_r')) ||
+        (comp.typeId === 'ic_555' && pinId === 'pin1')
       ) {
         hasGnd = true;
       }
@@ -413,6 +429,24 @@ export function analyzeCircuit(
       activeComponents[comp.id] = {
         simActive: isPressed,
         statusText: isPressed ? 'Trykket inn (Lukket krets)' : 'Åpen bryter',
+      };
+    }
+
+    // NE555 Timer IC check
+    if (comp.typeId === 'ic_555') {
+      const vccRoot = dsu.find(pinKey(comp.id, 'pin8'));
+      const gndRoot = dsu.find(pinKey(comp.id, 'pin1'));
+      const isVccPower = netIsPower.get(vccRoot) ?? false;
+      const isGndOk = netIsGround.get(gndRoot) ?? false;
+      const isOperating = isVccPower && isGndOk;
+      const isPulseHigh = clockTick === 0 || (clockTick % 2 === 0);
+
+      activeComponents[comp.id] = {
+        simActive: isOperating && isPulseHigh,
+        simVoltage: isOperating ? (isPulseHigh ? 5.0 : 0.0) : 0,
+        statusText: isOperating
+          ? `Aktiv NE555 oscillator (${isPulseHigh ? 'HØY' : 'LAV'} puls)`
+          : 'Mangler strøm (koble til VCC & GND)',
       };
     }
 

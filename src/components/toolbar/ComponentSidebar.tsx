@@ -484,13 +484,20 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
             const compTags = comp.tags || (comp.isCustom ? ['custom'] : []);
 
             return (
-              <div
+              <Tooltip
                 key={comp.typeId}
-                draggable
-                onDragStart={(e) => handleDragStart(e, comp.typeId)}
-                onClick={() => onAddComponent(comp.typeId)}
-                className="p-2.5 rounded-lg bg-slate-800/70 hover:bg-slate-800 border border-slate-700/70 hover:border-blue-500 cursor-grab active:cursor-grabbing transition group flex flex-col justify-between shadow-sm hover:shadow"
+                title={`Legg til ${comp.name}`}
+                description="Klikk for å plassere i kretsen, eller dra direkte til ønsket posisjon på lerretet"
+                shortcut="Dra & Slipp"
+                position="right"
+                className="w-full block"
               >
+                <div
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, comp.typeId)}
+                  onClick={() => onAddComponent(comp.typeId)}
+                  className="w-full p-2.5 rounded-lg bg-slate-800/70 hover:bg-slate-800 border border-slate-700/70 hover:border-blue-500 cursor-grab active:cursor-grabbing transition group flex flex-col justify-between shadow-sm hover:shadow text-left"
+                >
                 <div>
                   {/* Category Pill & Badges */}
                   <div className="flex items-center justify-between gap-1 mb-1">
@@ -564,8 +571,9 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
                   </span>
                 </div>
               </div>
-            );
-          })
+            </Tooltip>
+          );
+        })
         )}
       </div>
 

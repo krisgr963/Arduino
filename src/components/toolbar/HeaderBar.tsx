@@ -23,6 +23,8 @@ import {
   Layers,
   FileText,
   Image as ImageIcon,
+  Route,
+  Gauge,
 } from 'lucide-react';
 import { Tooltip } from '../common/Tooltip';
 
@@ -30,12 +32,15 @@ interface HeaderBarProps {
   projectName: string;
   isSimulating: boolean;
   onToggleSimulation: () => void;
+  simulationSpeed?: number;
+  onChangeSimulationSpeed?: (speed: number) => void;
   warnings: ERCWarning[];
   onOpenERCWarnings: () => void;
   onOpenBOM: () => void;
   onOpenProjects: () => void;
   onAddStickyNote: () => void;
   onAutoLayout?: () => void;
+  onAutoRouteWires?: () => void;
   snapToGrid: boolean;
   onToggleSnapToGrid: () => void;
   activeWireColor: string;
@@ -72,12 +77,15 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   projectName,
   isSimulating,
   onToggleSimulation,
+  simulationSpeed = 1.0,
+  onChangeSimulationSpeed,
   warnings,
   onOpenERCWarnings,
   onOpenBOM,
   onOpenProjects,
   onAddStickyNote,
   onAutoLayout,
+  onAutoRouteWires,
   snapToGrid,
   onToggleSnapToGrid,
   activeWireColor,
@@ -203,6 +211,45 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
           </button>
         </Tooltip>
 
+        {/* Simulation Speed Slider Control */}
+        {onChangeSimulationSpeed && (
+          <Tooltip
+            title="Simuleringshastighet"
+            description="Juster klokkehastigheten for logikksimuleringen (0.1x til 5.0x). Sakte fart er ideelt for å se logiske pulser i sakte film, mens høy fart øker oscillasjonen."
+            shortcut={`${simulationSpeed.toFixed(1)}x`}
+            position="bottom"
+          >
+            <div className="flex items-center space-x-2 bg-slate-900 px-2.5 py-1.5 rounded-xl border border-slate-800 shadow-inner text-xs">
+              <div className="flex items-center space-x-1.5 text-slate-400">
+                <Gauge className="w-3.5 h-3.5 text-cyan-400" />
+                <span className="hidden xl:inline text-[11px] font-medium text-slate-300">Hastighet:</span>
+              </div>
+
+              {/* Speed Slider Input */}
+              <input
+                type="range"
+                min="0.1"
+                max="5.0"
+                step="0.1"
+                value={simulationSpeed}
+                onChange={(e) => onChangeSimulationSpeed(parseFloat(e.target.value))}
+                className="w-16 sm:w-20 md:w-24 h-1.5 bg-slate-850 rounded-lg appearance-none cursor-pointer accent-cyan-400 hover:accent-cyan-300 transition"
+                aria-label="Simuleringshastighet slider"
+              />
+
+              {/* Multiplier Badge with Click-to-Reset to 1.0x */}
+              <button
+                type="button"
+                onClick={() => onChangeSimulationSpeed(1.0)}
+                className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-750 text-cyan-300 hover:text-white border border-cyan-500/30 text-[10px] font-mono font-bold transition shadow-sm"
+                title="Klikk for å tilbakestille til standard 1.0x"
+              >
+                {simulationSpeed === 1.0 ? '1.0x' : `${simulationSpeed.toFixed(1)}x`}
+              </button>
+            </div>
+          </Tooltip>
+        )}
+
         {/* Wire Color Selector */}
         <div className="hidden lg:flex items-center space-x-1 bg-slate-900 px-2 py-1 rounded-lg border border-slate-800">
           <span className="text-[11px] text-slate-400 mr-1.5 font-medium">Ledningsfarge:</span>
@@ -307,6 +354,25 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
             >
               <LayoutGrid className="w-4 h-4 text-cyan-400" />
               <span className="hidden xl:inline">Autolayout</span>
+            </button>
+          </Tooltip>
+        )}
+
+        {/* Auto-route ledninger-knapp */}
+        {onAutoRouteWires && (
+          <Tooltip
+            title="Auto-route ledninger"
+            shortcut="R"
+            description="Rydder opp i komplekse koblinger og finner den mest direkte og ryddige stien mellom pinner"
+            position="bottom"
+          >
+            <button
+              onClick={onAutoRouteWires}
+              className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-850 text-slate-200 hover:text-emerald-300 border border-slate-800 hover:border-emerald-500/40 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition shadow"
+              aria-label="Auto-route ledninger"
+            >
+              <Route className="w-4 h-4 text-emerald-400" />
+              <span className="hidden xl:inline">Auto-route</span>
             </button>
           </Tooltip>
         )}

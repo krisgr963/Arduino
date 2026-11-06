@@ -13,6 +13,7 @@ interface ComponentRendererProps {
   definition: ComponentDefinition;
   isSelected: boolean;
   isSimulating: boolean;
+  simulationSpeed?: number;
   hoveredPinId: string | null;
   activePinId: string | null;
   onPinMouseDown?: (pin: PinDefinition, e: React.MouseEvent) => void;
@@ -26,6 +27,7 @@ export const ComponentRenderer: React.FC<ComponentRendererProps> = ({
   definition,
   isSelected,
   isSimulating,
+  simulationSpeed = 1.0,
   hoveredPinId,
   activePinId,
   onPinMouseDown,
@@ -1073,6 +1075,7 @@ function getBreadboardCoordLabel(pinId: string): string {
                 component={component}
                 definition={definition}
                 isSimulating={isSimulating}
+                simulationSpeed={simulationSpeed}
                 simVoltage={component.state?.simVoltage}
               />
             </foreignObject>
@@ -1095,10 +1098,117 @@ function getBreadboardCoordLabel(pinId: string): string {
                 component={component}
                 definition={definition}
                 isSimulating={isSimulating}
+                simulationSpeed={simulationSpeed}
                 simVoltageCh1={component.state?.simVoltage}
                 simVoltageCh2={component.state?.simVoltageCh2}
               />
             </foreignObject>
+          </g>
+        );
+      }
+
+      // 14. NE555 Timer IC (DIP-8 Package)
+      case 'ic_555': {
+        return (
+          <g>
+            {/* 8 Metallic Lead Tabs */}
+            {[12, 24, 36, 48].map((y, i) => (
+              <React.Fragment key={i}>
+                <rect x={6} y={y - 2.5} width={10} height={5} rx={1} fill="#94a3b8" />
+                <rect x={60} y={y - 2.5} width={10} height={5} rx={1} fill="#94a3b8" />
+              </React.Fragment>
+            ))}
+
+            {/* DIP-8 Molded Epoxy Body */}
+            <rect
+              x={14}
+              y={4}
+              width={48}
+              height={56}
+              rx={3}
+              fill="#1e293b"
+              stroke="#0f172a"
+              strokeWidth={1.5}
+            />
+
+            {/* Top Orientation Notch */}
+            <path d="M 34 4 A 4 4 0 0 0 42 4 Z" fill="#0f172a" />
+
+            {/* Pin 1 Index Dimple Dot */}
+            <circle cx={22} cy={12} r={2} fill="#334155" />
+
+            {/* Printed Laser Marking */}
+            <text
+              x={38}
+              y={28}
+              fill="#e2e8f0"
+              fontSize={8.5}
+              fontWeight="bold"
+              fontFamily="monospace"
+              textAnchor="middle"
+            >
+              NE555P
+            </text>
+            <text
+              x={38}
+              y={40}
+              fill="#94a3b8"
+              fontSize={6.5}
+              fontFamily="monospace"
+              textAnchor="middle"
+            >
+              TIMER
+            </text>
+            <text
+              x={38}
+              y={51}
+              fill="#64748b"
+              fontSize={6}
+              fontFamily="monospace"
+              textAnchor="middle"
+            >
+              {component.label}
+            </text>
+          </g>
+        );
+      }
+
+      // 15. Elektrolyttkondensator (Radial Can)
+      case 'capacitor_electrolytic': {
+        return (
+          <g>
+            {/* Long metallic leads */}
+            <line x1={16} y1={36} x2={16} y2={48} stroke="#94a3b8" strokeWidth={2} strokeLinecap="round" />
+            <line x1={34} y1={36} x2={34} y2={48} stroke="#94a3b8" strokeWidth={2} strokeLinecap="round" />
+
+            {/* Aluminum Can Casing */}
+            <rect
+              x={8}
+              y={4}
+              width={34}
+              height={34}
+              rx={6}
+              fill="#0369a1"
+              stroke="#0284c7"
+              strokeWidth={1.5}
+            />
+
+            {/* Negative Cathode Stripe */}
+            <rect x={28} y={4} width={12} height={34} rx={2} fill="#0f172a" opacity={0.65} />
+            <text x={34} y={15} fill="#ffffff" fontSize={8} fontWeight="bold" textAnchor="middle">-</text>
+            <text x={34} y={24} fill="#ffffff" fontSize={8} fontWeight="bold" textAnchor="middle">-</text>
+            <text x={34} y={33} fill="#ffffff" fontSize={8} fontWeight="bold" textAnchor="middle">-</text>
+
+            {/* Top Vent Emboss */}
+            <path d="M 17 8 L 23 14 M 23 8 L 17 14" stroke="#0284c7" strokeWidth={1} opacity={0.6} />
+
+            {/* Rating Print */}
+            <text x={18} y={23} fill="#e0f2fe" fontSize={7} fontWeight="bold" textAnchor="middle">
+              10µF
+            </text>
+            <text x={18} y={32} fill="#bae6fd" fontSize={5.5} textAnchor="middle">
+              {component.label}
+            </text>
           </g>
         );
       }
